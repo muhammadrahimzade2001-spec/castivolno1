@@ -12,102 +12,78 @@ const client = new Client({
 const PREFIX = "!";
 
 client.on('ready', () => {
-    console.log(`🛡️ Castivol v6.0 İmparatorluğu Başlatıldı!`);
+    console.log(`🛡️ Castivol Mega Sistem Aktif!`);
 });
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
-
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // 📜 YARDIM PANELİ
-    if (command === "yardım") {
-        const embed = new EmbedBuilder()
-            .setTitle("🛡️ Castivol v6.0 Komut Listesi")
-            .setColor("#000000")
-            .addFields(
-                { name: '🏗️ Ana Sistem', value: '`!kur` - Sunucuyu sıfırlar ve düzeni kurar.' },
-                { name: '🧹 Moderasyon', value: '`!sil [sayı]` - Belirtilen sayıda mesajı siler.' },
-                { name: '⚔️ Savaş', value: '`!savaş` - Acil durum savaş çağrısı yapar.' },
-                { name: '🛰️ Sistem', value: '`!ping` - Bot hızını ölçer.' }
-            )
-            .setFooter({ text: "Castivol Management" });
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    // 🏗️ GELİŞMİŞ KUR KOMUTU
     if (command === "kur") {
-        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Bu komutu sadece **Owner** kullanabilir.");
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('onay_kur').setLabel('EVET, KUR').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('iptal_kur').setLabel('HAYIR, İPTAL').setStyle(ButtonStyle.Secondary)
-        );
-
-        return message.channel.send({ 
-            content: "🚨 **DİKKAT!** Sunucu tamamen sıfırlanacak ve Castivol düzeni kurulacak. Onaylıyor musun?", 
-            components: [row] 
-        });
+        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Sadece **Owner** kurabilir.");
+        const btn = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('mega_kur').setLabel('İmparatorluğu İnşa Et (30+ Kanal)').setStyle(ButtonStyle.Danger));
+        return message.channel.send({ content: "🚨 **CASTIVOL MEGA KURULUM** başlıyor. Sunucu tamamen sıfırlanacak. Hazır mısın?", components: [btn] });
     }
 
-    // 🧹 SİL KOMUTU
-    if (command === "sil") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return message.reply("Yetkin yok kanka.");
-        const sayi = parseInt(args[0]) || 50;
-        await message.channel.bulkDelete(sayi > 100 ? 100 : sayi, true).catch(err => message.reply("14 günden eski mesajları silemem kanka."));
-        return message.channel.send(`🧹 **${sayi}** mesaj temizlendi.`).then(m => setTimeout(() => m.delete(), 3000));
+    if (command === "yardım") {
+        return message.reply("📜 **Komutlar:** `!kur` (Sunucuyu Kur), `!sil [1-100]` (Mesaj Sil), `!savaş` (Savaş Alarmi), `!ping` (Gecikme)");
     }
-
-    // ⚔️ SAVAŞ KOMUTU
-    if (command === "savaş") {
-        const warEmbed = new EmbedBuilder()
-            .setTitle("⚔️ CASTIVOL SAVAŞ ALARMI!")
-            .setDescription("Tüm kadro aktif olsun, operasyon başlıyor! @everyone")
-            .setColor("DarkRed")
-            .setImage("https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueXF4ZzZ4eXN4ZzZ4eXN4ZzZ4eXN4ZzZ4eXN4ZzZ4eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2z6OlbAisS6Z2/giphy.gif");
-        return message.channel.send({ content: "@everyone", embeds: [warEmbed] });
-    }
-
-    // 🛰️ PİNG
-    if (command === "ping") return message.reply(`🛰️ Gecikme: **${client.ws.ping}ms**`);
 });
 
-// 🖱️ ETKİLEŞİMLER (BUTONLAR)
 client.on('interactionCreate', async (i) => {
-    if (!i.isButton()) return;
+    if (i.customId === 'mega_kur') {
+        await i.reply({ content: "🛠️ Dev inşaat başladı, lütfen bekleyin...", ephemeral: true });
 
-    if (i.customId === 'onay_kur') {
-        await i.reply({ content: "🛠️ İmparatorluk inşası başladı, bu biraz sürebilir...", ephemeral: true });
+        // --- 🌪️ TEMİZLİK ---
+        const chs = await i.guild.channels.fetch();
+        for (const c of chs.values()) await c.delete().catch(() => {});
+        const rls = await i.guild.roles.fetch();
+        for (const r of rls.values()) { if (!r.managed && r.name !== "@everyone") await r.delete().catch(() => {}); }
 
-        // 🌪️ TÜM KANALLARI SİL
-        const channels = await i.guild.channels.fetch();
-        for (const c of channels.values()) {
-            await c.delete().catch(() => {});
-        }
-
-        // 👑 ROLLERİ OLUŞTUR (Hiyerarşik)
+        // --- 👑 ROLLER ---
         const roles = [
-            { n: '🛡️ Castivol', c: '#000000' },
-            { n: '👑 owner', c: '#ff0000' },
-            { n: '👑 founder', c: '#910000' },
-            { n: '⚔️ co founder', c: '#ff4a4a' },
-            { n: '💎 admin', c: '#2ecc71' },
-            { n: '👤 üye', c: '#bdc3c7' }
+            { n: '🛡️ Castivol', c: '#000000' }, { n: '👑 owner', c: '#ff0000' }, { n: '👑 founder', c: '#910000' },
+            { n: '⚔️ co founder', c: '#ff4a4a' }, { n: '🎖️ yönetici', c: '#e67e22' }, { n: '💎 admin', c: '#2ecc71' },
+            { n: '🔥 elit üye', c: '#f1c40f' }, { n: '👤 üye', c: '#bdc3c7' }
         ];
+        for (const r of roles) await i.guild.roles.create({ name: r.n, color: r.c, hoist: true });
 
-        for (const r of roles) {
-            await i.guild.roles.create({ name: r.n, color: r.c, hoist: true }).catch(() => {});
-        }
+        // --- 📂 KATEGORİ VE KANAL YAPISI ---
+        const createCat = async (name) => await i.guild.channels.create({ name: name, type: ChannelType.GuildCategory });
+        const createCh = async (name, parentId, type = ChannelType.GuildText) => await i.guild.channels.create({ name: name, parent: parentId, type: type });
 
-        // 📂 KATEGORİ VE KANALLAR
-        const category = await i.guild.channels.create({ name: '─── CASTIVOL ───', type: ChannelType.GuildCategory });
-        await i.guild.channels.create({ name: '💬-sohbet', parent: category.id });
-        await i.guild.channels.create({ name: '📢-duyuru', parent: category.id });
-        await i.guild.channels.create({ name: '🧧-işlem-merkezi', parent: category.id });
+        // 1. BİLGİLENDİRME
+        const c1 = await createCat('─── BİLGİ ───');
+        const BilgiCh = ['📢-duyuru', '📜-kurallar', '🧧-işlem-merkezi', '🎭-rol-alma', '🚀-boost-bilgi'];
+        for (const n of BilgiCh) await createCh(n, c1.id);
 
-    } else if (i.customId === 'iptal_kur') {
-        await i.update({ content: "❌ Kurulum iptal edildi.", components: [], embeds: [] });
+        // 2. SOSYAL ALAN
+        const c2 = await createCat('─── SOSYAL ───');
+        const SosyalCh = ['💬-sohbet', '🤖-bot-komut', '📷-medya', '🎨-tasarım', '🎰-kumar'];
+        for (const n of SosyalCh) await createCh(n, c2.id);
+
+        // 3. KLAN / SAVAŞ MERKEZİ
+        const c3 = await createCat('─── SAVAŞ MERKEZİ ───');
+        const SavasCh = ['⚔️-savaş-duyuru', '🛡️-kadro-listesi', '📊-savaş-istatistik', '🛑-cezalılar', '🏅-başarılar'];
+        for (const n of SavasCh) await createCh(n, c3.id);
+
+        // 4. SESLİ ODALAR
+        const c4 = await createCat('─── SESLİ ALAN ───');
+        const SesCh = ['🔊-Genel-Sohbet', '🎮-Oyun-Odası', '🎵-Müzik-1', '🎵-Müzik-2', '💤-AFK'];
+        for (const n of SesCh) await createCh(n, c4.id, ChannelType.GuildVoice);
+
+        // 5. YÖNETİM (SADECE YETKİLİ)
+        const c5 = await createCat('─── YÖNETİM ───');
+        const YonetimCh = ['👑-owner-private', '📂-toplantı-odası', '📝-log-merkezi', '🛡️-yetkili-chat'];
+        for (const n of YonetimCh) await createCh(n, c5.id);
+
+        // 6. DESTEK
+        const c6 = await createCat('─── DESTEK ───');
+        await createCh('🎫-ticket-aç', c6.id);
+        await createCh('🆘-yardım', c6.id);
+
+        console.log("✅ Kurulum Tamamlandı.");
     }
 });
 
