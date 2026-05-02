@@ -12,7 +12,7 @@ const client = new Client({
 const PREFIX = "!";
 
 client.on('ready', () => {
-    console.log(`🛡️ Castivol Sistemi Aktif!`);
+    console.log(`🛡️ Castivol Mega Sistem Aktif!`);
 });
 
 client.on('messageCreate', async (message) => {
@@ -21,116 +21,82 @@ client.on('messageCreate', async (message) => {
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // 1. YARDIM KOMUTU (Sadeleşmiş)
-    if (command === "yardım") {
+    // 📢 DUYURU KOMUTU (GELİŞMİŞ)
+    if (command === "duyuru") {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.MentionEveryone)) return message.reply("❌ Duyuru yapma yetkin yok.");
+        const text = args.join(" ");
+        if (!text) return message.reply("❌ Duyuru metnini yazmadın kanka.");
+
         const embed = new EmbedBuilder()
-            .setTitle("🛡️ Castivol Komut Paneli")
-            .setColor("#000000")
-            .setDescription("Güvenlik ve düzen için tasarlanmış komutlar.")
-            .addFields(
-                { name: '🔨 Yönetim', value: '`!sil`, `!ban`, `!kick`, `!kilit`' },
-                { name: '⚔️ Operasyon', value: '`!savaş`, `!toplan`, `!yaz`' },
-                { name: '🏗️ Sistem', value: '`!kur` (Owner Özel)' }
-            );
-        return message.channel.send({ embeds: [embed] });
-    }
+            .setTitle("📢 CASTIVOL RESMİ DUYURU")
+            .setDescription(`\n${text}\n`)
+            .setColor("Gold")
+            .setThumbnail(message.guild.iconURL())
+            .setFooter({ text: `Duyuruyu Yapan: ${message.author.tag}`, iconURL: message.author.displayAvatarURL() })
+            .setTimestamp();
 
-    // 2. SİL KOMUTU (Yetki Kontrollü)
-    if (command === "sil") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return message.reply("❌ Bu komutu sadece **Mesajları Yönet** yetkisi olanlar kullanabilir.");
-        const sayi = parseInt(args[0]);
-        if (!sayi || sayi < 1 || sayi > 100) return message.reply("❌ 1-100 arası bir miktar belirt kanka.");
-        await message.channel.bulkDelete(sayi, true).catch(() => {});
-        return message.channel.send(`🧹 **${sayi}** mesaj temizlendi.`).then(m => setTimeout(() => m.delete(), 2000));
-    }
-
-    // 3. BAN KOMUTU (Yetki Kontrollü)
-    if (command === "ban") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) return message.reply("❌ Üyeleri yasaklama yetkin yok kanka.");
-        const user = message.mentions.members.first();
-        if (!user) return message.reply("❌ Banlanacak kişiyi etiketle.");
-        if (user.roles.highest.position >= message.member.roles.highest.position) return message.reply("❌ Senden üstte veya seninle aynı rolde olan birini banlayamazsın.");
-        await user.ban({ reason: 'Castivol Düzeni' }).catch(() => message.reply("❌ Yetkim yetmiyor."));
-        return message.channel.send(`🔨 **${user.user.tag}** sunucudan yasaklandı.`);
-    }
-
-    // 4. KICK KOMUTU (Yetki Kontrollü)
-    if (command === "kick") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) return message.reply("❌ Üyeleri atma yetkin yok.");
-        const user = message.mentions.members.first();
-        if (!user) return message.reply("❌ Atılacak kişiyi etiketle.");
-        await user.kick().catch(() => message.reply("❌ Yetkim yetmiyor."));
-        return message.channel.send(`👞 **${user.user.tag}** sunucudan atıldı.`);
-    }
-
-    // 5. KİLİT KOMUTU (Kanalı Konuşmaya Kapatır)
-    if (command === "kilit") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) return message.reply("❌ Kanalları yönetme yetkin yok.");
-        message.channel.permissionOverwrites.edit(message.guild.id, { SendMessages: false });
-        return message.channel.send("🔒 Kanal kilitlendi.");
-    }
-
-    // 6. SAVAŞ ÇAĞRISI
-    if (command === "savaş") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.MentionEveryone)) return message.reply("❌ Duyuru yetkin yok.");
-        const embed = new EmbedBuilder()
-            .setTitle("⚔️ CASTIVOL: SAVAŞ ÇAĞRISI")
-            .setImage("https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmY4bmN3b3ZpZHR6eHR4eHR4eHR4eHR4eHR4eHR4eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2z6OlbAisS6Z2/giphy.gif")
-            .setColor("DarkRed");
+        message.delete();
         return message.channel.send({ content: "@everyone", embeds: [embed] });
     }
 
-    // 7. TOPLAN KOMUTU
-    if (command === "toplan") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.MentionEveryone)) return message.reply("❌ Duyuru yetkin yok.");
-        return message.channel.send("🚨 **ACİL TOPLANIN!** Castivol kadrosu buraya! @here");
-    }
-
-    // 8. YAZ KOMUTU
-    if (command === "yaz") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
-        const msg = args.join(" ");
-        if (!msg) return;
-        message.delete();
-        return message.channel.send(msg);
-    }
-
-    // 9. KUR KOMUTU ( OWNER ÖZEL )
+    // 🏗️ MEGA KUR KOMUTU (OWNER)
     if (command === "kur") {
-        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Bu komut sadece **Sunucu Sahibi (Owner)** içindir.");
-        const btn = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('mega_kur').setLabel('İmparatorluğu Kur').setStyle(ButtonStyle.Danger));
-        return message.channel.send({ content: "🚨 **Sunucu Sıfırlanacak.** Onaylıyor musun?", components: [btn] });
+        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Sadece **Owner** kurabilir.");
+        const btn = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('mega_kur').setLabel('30+ Kanalı İnşa Et').setStyle(ButtonStyle.Danger));
+        return message.channel.send({ content: "🚨 **CASTIVOL MEGA KURULUM** başlıyor. Hazır mısın?", components: [btn] });
+    }
+
+    // 🔨 MODERASYON
+    if (command === "sil") {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
+        const sayi = parseInt(args[0]) || 50;
+        await message.channel.bulkDelete(sayi > 100 ? 100 : sayi, true).catch(() => {});
+        return message.channel.send(`🧹 **${sayi}** mesaj silindi.`).then(m => setTimeout(() => m.delete(), 2000));
+    }
+
+    if (command === "yardım") {
+        const h = new EmbedBuilder().setTitle("🛡️ Komutlar").setColor("White").setDescription("`!kur`, `!duyuru`, `!sil`, `!ban`, `!kick`, `!savaş`, `!yaz`").setFooter({text: "Yetkisiz kişiler komut kullanamaz."});
+        return message.channel.send({ embeds: [h] });
     }
 });
 
-// --- KURULUM SİSTEMİ ---
+// --- MEGA KURULUM ETKİLEŞİMİ ---
 client.on('interactionCreate', async (i) => {
-    if (!i.isButton()) return;
     if (i.customId === 'mega_kur') {
-        if (i.user.id !== i.guild.ownerId) return i.reply({ content: "❌ Butonu sadece Owner kullanabilir.", ephemeral: true });
+        if (i.user.id !== i.guild.ownerId) return i.reply({ content: "❌ Yetkin yok.", ephemeral: true });
 
-        await i.reply({ content: "🛠️ Temizlik ve inşa başladı...", ephemeral: true });
+        await i.reply({ content: "🛠️ Dev yapılandırma başladı...", ephemeral: true });
 
+        // Kanalları temizle
         const chs = await i.guild.channels.fetch();
         for (const c of chs.values()) await c.delete().catch(() => {});
         
-        const roles = [
-            { n: '🛡️ Castivol', c: '#000000' }, { n: '👑 owner', c: '#ff0000' }, { n: '👑 founder', c: '#910000' },
-            { n: '🎖️ yönetici', c: '#e67e22' }, { n: '💎 admin', c: '#2ecc71' }, { n: '👤 üye', c: '#bdc3c7' }
-        ];
-        for (const r of roles) await i.guild.roles.create({ name: r.n, color: r.c, hoist: true });
+        // Roller
+        const rls = ['🛡️ Castivol', '👑 owner', '👑 founder', '🎖️ yönetici', '💎 admin', '👤 üye'];
+        for (const r of rls) await i.guild.roles.create({ name: r, color: 'Random', hoist: true });
 
-        const cat1 = await i.guild.channels.create({ name: '── BİLGİ ──', type: ChannelType.GuildCategory });
-        await i.guild.channels.create({ name: '📢-duyuru', parent: cat1.id });
-        await i.guild.channels.create({ name: '📜-kurallar', parent: cat1.id });
+        const createCat = async (n) => await i.guild.channels.create({ name: n, type: ChannelType.GuildCategory });
+        const createCh = async (n, p, t = ChannelType.GuildText) => await i.guild.channels.create({ name: n, parent: p, type: t });
 
-        const cat2 = await i.guild.channels.create({ name: '── SOSYAL ──', type: ChannelType.GuildCategory });
-        await i.guild.channels.create({ name: '💬-sohbet', parent: cat2.id });
-        await i.guild.channels.create({ name: '🤖-bot-komut', parent: cat2.id });
+        // 1. BİLGİ (5 Kanal)
+        const c1 = await createCat('── BİLGİ ──');
+        for (const n of ['📢-duyuru', '📜-kurallar', '🧧-işlem-merkezi', '🎭-rol-alma', '🚀-boost']) await createCh(n, c1.id);
 
-        const cat3 = await i.guild.channels.create({ name: '── SAVAŞ ──', type: ChannelType.GuildCategory });
-        await i.guild.channels.create({ name: '⚔️-savaş-duyuru', parent: cat3.id });
-        await i.guild.channels.create({ name: '📊-istatistik', parent: cat3.id });
+        // 2. SOSYAL (7 Kanal)
+        const c2 = await createCat('── SOSYAL ──');
+        for (const n of ['💬-sohbet', '🤖-bot-komut', '📷-medya', '🎨-tasarım', '🎰-kumar', '🕊️-itiraf', '🎂-doğum-günü']) await createCh(n, c2.id);
+
+        // 3. SAVAŞ & KLAN (6 Kanal)
+        const c3 = await createCat('── SAVAŞ MERKEZİ ──');
+        for (const n of ['⚔️-savaş-duyuru', '📊-istatistik', '🛡️-kadro', '🛑-cezalılar', '🎖️-başarılar', '📣-toplanma']) await createCh(n, c3.id);
+
+        // 4. SESLİ ODALAR (8 Kanal)
+        const c4 = await createCat('── SESLİ ALAN ──');
+        for (const n of ['🔊-Genel', '🎮-Oyun-1', '🎮-Oyun-2', '🎵-Müzik-1', '🎵-Müzik-2', '💤-AFK', '🎥-Yayın-Odası', '🎤-Toplantı']) await createCh(n, c4.id, ChannelType.GuildVoice);
+
+        // 5. YÖNETİM (4 Kanal)
+        const c5 = await createCat('── YÖNETİM ──');
+        for (const n of ['👑-owner-özel', '🛡️-yetkili-chat', '📝-log', '📂-arşiv']) await createCh(n, c5.id);
     }
 });
 
