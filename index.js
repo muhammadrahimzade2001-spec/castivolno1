@@ -12,106 +12,102 @@ const client = new Client({
 const PREFIX = "!";
 
 client.on('ready', () => {
-    console.log(`🛡️ Castivol v6.0 İmparatorluğu Aktif! Bot: ${client.user.tag}`);
+    console.log(`🛡️ Castivol v6.0 İmparatorluğu Başlatıldı!`);
 });
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
+
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // --- 📜 YARDIM KOMUTU ---
+    // 📜 YARDIM PANELİ
     if (command === "yardım") {
-        const helpEmbed = new EmbedBuilder()
-            .setTitle("🛡️ Castivol v6.0 Komut Paneli")
+        const embed = new EmbedBuilder()
+            .setTitle("🛡️ Castivol v6.0 Komut Listesi")
             .setColor("#000000")
-            .setThumbnail(client.user.displayAvatarURL())
             .addFields(
-                { name: '🏗️ Ana Komutlar', value: '`!kur` - Sunucuyu sıfırlar ve Castivol düzenini kurar.\n`!sil [sayı]` - Belirtilen miktarda mesajı temizler.' },
-                { name: '📢 Duyuru Komutları', value: '`!duyuru [mesaj]` - Herkese etiket atarak duyuru yapar.\n`!savaş` - Acil durum savaş çağrısı başlatır.' },
-                { name: 'ℹ️ Bilgi', value: '`!ping` - Botun gecikmesini gösterir.\n`!avatar` - Profil fotoğrafınızı gösterir.' }
+                { name: '🏗️ Ana Sistem', value: '`!kur` - Sunucuyu sıfırlar ve düzeni kurar.' },
+                { name: '🧹 Moderasyon', value: '`!sil [sayı]` - Belirtilen sayıda mesajı siler.' },
+                { name: '⚔️ Savaş', value: '`!savaş` - Acil durum savaş çağrısı yapar.' },
+                { name: '🛰️ Sistem', value: '`!ping` - Bot hızını ölçer.' }
             )
-            .setFooter({ text: 'Castivol Management System' });
-        
-        return message.channel.send({ embeds: [helpEmbed] });
+            .setFooter({ text: "Castivol Management" });
+        return message.channel.send({ embeds: [embed] });
     }
 
-    // --- 🏗️ KUR KOMUTU (GELİŞTİRİLDİ) ---
+    // 🏗️ GELİŞMİŞ KUR KOMUTU
     if (command === "kur") {
-        // Güvenlik: Sadece sunucu sahibi
-        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Bu işlem için **Owner** olman lazım kanka.");
+        if (message.author.id !== message.guild.ownerId) return message.reply("❌ Bu komutu sadece **Owner** kullanabilir.");
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('onay').setLabel('İnşayı Başlat').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('iptal').setLabel('İptal Et').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('onay_kur').setLabel('EVET, KUR').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('iptal_kur').setLabel('HAYIR, İPTAL').setStyle(ButtonStyle.Secondary)
         );
 
-        const kurEmbed = new EmbedBuilder()
-            .setTitle("⚠️ Sunucu Yapılandırması")
-            .setDescription("Bu işlem tüm kanalları ve rolleri silecek. **Castivol İmparatorluk** düzeni kurulacak. Onaylıyor musun?")
-            .setColor("Red");
-
-        return message.channel.send({ embeds: [kurEmbed], components: [row] });
+        return message.channel.send({ 
+            content: "🚨 **DİKKAT!** Sunucu tamamen sıfırlanacak ve Castivol düzeni kurulacak. Onaylıyor musun?", 
+            components: [row] 
+        });
     }
 
-    // --- 🧹 SİL KOMUTU ---
+    // 🧹 SİL KOMUTU
     if (command === "sil") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return;
-        const count = parseInt(args[0]) || 100;
-        await message.channel.bulkDelete(count > 100 ? 100 : count, true);
-        return message.channel.send(`🧹 **${count}** mesaj süpürüldü.`).then(m => setTimeout(() => m.delete(), 3000));
+        if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return message.reply("Yetkin yok kanka.");
+        const sayi = parseInt(args[0]) || 50;
+        await message.channel.bulkDelete(sayi > 100 ? 100 : sayi, true).catch(err => message.reply("14 günden eski mesajları silemem kanka."));
+        return message.channel.send(`🧹 **${sayi}** mesaj temizlendi.`).then(m => setTimeout(() => m.delete(), 3000));
     }
 
-    // --- ⚔️ SAVAŞ KOMUTU ---
+    // ⚔️ SAVAŞ KOMUTU
     if (command === "savaş") {
         const warEmbed = new EmbedBuilder()
-            .setTitle("⚔️ ACİL DURUM: SAVAŞ ÇAĞRISI")
-            .setDescription("Tüm kadro toplanın! Castivol saldırı altında veya operasyon başlıyor!")
+            .setTitle("⚔️ CASTIVOL SAVAŞ ALARMI!")
+            .setDescription("Tüm kadro aktif olsun, operasyon başlıyor! @everyone")
             .setColor("DarkRed")
             .setImage("https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueXF4ZzZ4eXN4ZzZ4eXN4ZzZ4eXN4ZzZ4eXN4ZzZ4eCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/2z6OlbAisS6Z2/giphy.gif");
-        
         return message.channel.send({ content: "@everyone", embeds: [warEmbed] });
     }
+
+    // 🛰️ PİNG
+    if (command === "ping") return message.reply(`🛰️ Gecikme: **${client.ws.ping}ms**`);
 });
 
-// --- 🖱️ BUTON ETKİLEŞİMLERİ ---
+// 🖱️ ETKİLEŞİMLER (BUTONLAR)
 client.on('interactionCreate', async (i) => {
     if (!i.isButton()) return;
 
-    if (i.customId === 'onay') {
-        await i.reply({ content: "🛠️ Eski düzen yıkılıyor, Castivol inşa ediliyor...", ephemeral: true });
+    if (i.customId === 'onay_kur') {
+        await i.reply({ content: "🛠️ İmparatorluk inşası başladı, bu biraz sürebilir...", ephemeral: true });
 
-        // Kanalları sil
+        // 🌪️ TÜM KANALLARI SİL
         const channels = await i.guild.channels.fetch();
-        for (const c of channels.values()) await c.delete().catch(() => {});
-        
-        // Rolleri sil (Botun rolünün altındakileri siler)
-        const roles = await i.guild.roles.fetch();
-        for (const r of roles.values()) {
-            if (!r.managed && r.name !== "@everyone") await r.delete().catch(() => {});
+        for (const c of channels.values()) {
+            await c.delete().catch(() => {});
         }
 
-        // Yeni Roller
-        const roleData = [
+        // 👑 ROLLERİ OLUŞTUR (Hiyerarşik)
+        const roles = [
             { n: '🛡️ Castivol', c: '#000000' },
-            { n: '👑 owner', c: '#ff0000' }, 
-            { n: '👑 founder', c: '#990000' },
-            { n: '⚔️ co founder', c: '#ff4d4d' },
+            { n: '👑 owner', c: '#ff0000' },
+            { n: '👑 founder', c: '#910000' },
+            { n: '⚔️ co founder', c: '#ff4a4a' },
+            { n: '💎 admin', c: '#2ecc71' },
             { n: '👤 üye', c: '#bdc3c7' }
         ];
 
-        for (const r of roleData) {
-            await i.guild.roles.create({ name: r.n, color: r.c, hoist: true });
+        for (const r of roles) {
+            await i.guild.roles.create({ name: r.n, color: r.c, hoist: true }).catch(() => {});
         }
 
-        // Yeni Kanallar
-        const cat = await i.guild.channels.create({ name: '─── CASTIVOL ───', type: ChannelType.GuildCategory });
-        await i.guild.channels.create({ name: '💬-sohbet', parent: cat.id });
-        await i.guild.channels.create({ name: '📢-duyurular', parent: cat.id });
-        await i.guild.channels.create({ name: '🧧-işlem-merkezi', parent: cat.id });
+        // 📂 KATEGORİ VE KANALLAR
+        const category = await i.guild.channels.create({ name: '─── CASTIVOL ───', type: ChannelType.GuildCategory });
+        await i.guild.channels.create({ name: '💬-sohbet', parent: category.id });
+        await i.guild.channels.create({ name: '📢-duyuru', parent: category.id });
+        await i.guild.channels.create({ name: '🧧-işlem-merkezi', parent: category.id });
 
-    } else if (i.customId === 'iptal') {
-        await i.update({ content: "❌ İşlem iptal edildi.", embeds: [], components: [] });
+    } else if (i.customId === 'iptal_kur') {
+        await i.update({ content: "❌ Kurulum iptal edildi.", components: [], embeds: [] });
     }
 });
 
