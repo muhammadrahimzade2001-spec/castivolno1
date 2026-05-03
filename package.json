@@ -1,7 +1,7 @@
 {
   "name": "castivol-bot",
   "version": "1.0.0",
-  "description": "Castivol Professional Management System",
+  "description": "Castivol Professional System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
