@@ -1,18 +1,15 @@
 {
   "name": "castivol-bot",
   "version": "1.0.0",
-  "description": "Castivol Professional System",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "express": "^4.18.2"
-  },
-  "engines": {
-    "node": "18.x"
-  },
-  "author": "Castivol",
-  "license": "ISC"
+    "discord.js": "^14.14.1"
+  }
 }
