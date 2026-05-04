@@ -187,7 +187,7 @@ client.on("messageCreate", async (msg) => {
     return msg.channel.send({ embeds: [e("🚪 Çıkarıldı", `${t.user.tag} klandan çıkarıldı.`, COLORS.yellow)] });
   }
 
-  // ── XP KOMUTLARI ──
+  // ── XP ──
   if (cmd === "profil") {
     const t = msg.mentions.members.first() || msg.member;
     const xp = db.get(`xp_${msg.guild.id}_${t.id}`) || 0;
@@ -231,12 +231,20 @@ client.on("messageCreate", async (msg) => {
   }
 
   // ── MODERASYON ──
+  if (cmd === "ban") {
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.BanMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Ban yetkin yok.", COLORS.red)] });
+    const t = msg.mentions.members.first();
+    if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
+    await t.ban({ reason: args.slice(1).join(" ") || "Sebep yok" }).catch(() => {});
+    return msg.channel.send({ embeds: [e("🔨 Banlandı", `**${t.user.tag}** banlandı.`, COLORS.red)] });
+  }
+
   if (cmd === "kick") {
     if (!hasPerm(msg.member, PermissionsBitField.Flags.KickMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kick yetkin yok.", COLORS.red)] });
     const t = msg.mentions.members.first();
     if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
-    await t.kick(args.slice(1).join(" ") || "Sebep belirtilmedi").catch(() => {});
-    return msg.channel.send({ embeds: [e("👢 Atıldı", `**${t.user.tag}** sunucudan atıldı.`, COLORS.yellow)] });
+    await t.kick(args.slice(1).join(" ") || "Sebep yok").catch(() => {});
+    return msg.channel.send({ embeds: [e("👢 Atıldı", `**${t.user.tag}** atıldı.`, COLORS.yellow)] });
   }
 
   if (cmd === "mute") {
@@ -264,10 +272,32 @@ client.on("messageCreate", async (msg) => {
     const warns = db.get(key) || [];
     warns.push({ reason: args.slice(1).join(" ") || "Sebep yok", by: msg.author.tag, time: Date.now() });
     db.set(key, warns);
-    return msg.channel.send({ embeds: [e("⚠️ Uyarıldı", `${t.tag} uyarıldı. Toplam uyarı: **${warns.length}**`, COLORS.yellow)] });
+    return msg.channel.send({ embeds: [e("⚠️ Uyarıldı", `${t.tag} uyarıldı. Toplam: **${warns.length}**`, COLORS.yellow)] });
   }
 
-  // ── GENEL KOMUTLAR ──
+  if (cmd === "temizle") {
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageMessages)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Mesaj silme yetkin yok.", COLORS.red)] });
+    const n = parseInt(args[0]);
+    if (!n || n < 1 || n > 99) return msg.reply({ embeds: [e("❌ Hata", "1-99 arası sayı gir.", COLORS.red)] });
+    await msg.channel.bulkDelete(n + 1, true).catch(() => {});
+    const reply = await msg.channel.send({ embeds: [e("🗑️ Silindi", `**${n}** mesaj silindi.`, COLORS.blue)] });
+    setTimeout(() => reply.delete().catch(() => {}), 3000);
+  }
+
+  // ── KİLİTLE ve AÇ ──
+  if (cmd === "kilitle") {
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageChannels)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kanal yönetme yetkin yok.", COLORS.red)] });
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
+    return msg.channel.send({ embeds: [e("🔒 Kanal Kilitlendi", `${msg.channel} kanalı kilitlendi.`, COLORS.red)] });
+  }
+
+  if (cmd === "aç" || cmd === "ac") {
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageChannels)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kanal yönetme yetkin yok.", COLORS.red)] });
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
+    return msg.channel.send({ embeds: [e("🔓 Kanal Açıldı", `${msg.channel} kanalı açıldı.`, COLORS.green)] });
+  }
+
+  // ── GENEL ──
   if (cmd === "ping") {
     const s = await msg.reply({ embeds: [e("🏓 Pong!", "Hesaplanıyor...")] });
     const latency = s.createdTimestamp - msg.createdTimestamp;
