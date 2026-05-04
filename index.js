@@ -1,779 +1,288 @@
-// ╔══════════════════════════════════════════════════════════════╗
-// ║           ⚔️  KLAN DISCORD BOTU  ⚔️                          ║
-// ║     Moderasyon | XP | Ticket | Raid Koruması | Klan Yönetimi ║
-// ╚══════════════════════════════════════════════════════════════╝
-
 require("dotenv").config();
-const {
-  Client,
-  GatewayIntentBits,
-  Partials,
-  EmbedBuilder,
-  PermissionsBitField,
-  ChannelType,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  Collection,
-  AuditLogEvent,
-} = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { QuickDB } = require("quick.db");
 const ms = require("ms");
 
-// ───────────────────────────────────────────────
-// ⚙️  AYARLAR — Buraya kendi bilgilerini yaz
-// ───────────────────────────────────────────────
-const CONFIG = {
-  PREFIX: "!",
-  TOKEN: process.env.TOKEN || "BURAYA_TOKEN_YAZ",
-
-  // Renkler (embed renkleri)
-  COLORS: {
-    PRIMARY: 0x2ecc71,    // Yeşil — klan rengi
-    ERROR: 0xe74c3c,      // Kırmızı
-    WARN: 0xf39c12,       // Sarı
-    INFO: 0x3498db,       // Mavi
-    GOLD: 0xf1c40f,       // Altın — ödüller
-    DARK: 0x2c3e50,       // Koyu — genel
-  },
-
-  // XP Ayarları
-  XP: {
-    PER_MESSAGE: 10,        // Her mesaja verilen XP
-    COOLDOWN_MS: 60_000,    // 1 dakika bekleme (spam önleme)
-    LEVEL_MULTIPLIER: 100,  // level * 100 = gereken XP
-  },
-
-  // Raid Koruması
-  RAID: {
-    JOIN_THRESHOLD: 5,      // X saniyede kaç kişi gelirse alarm
-    JOIN_WINDOW_MS: 10_000, // Zaman penceresi (ms)
-    MIN_ACCOUNT_AGE_DAYS: 7, // Hesap yaş kontrolü (gün)
-  },
-
-  // Ticket Kategorisi ID (kendi sunucundaki kategori ID'sini yaz)
-  TICKET_CATEGORY_ID: process.env.TICKET_CATEGORY_ID || null,
-
-  // Log Kanalı ID
-  LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID || null,
-};
-
-// ───────────────────────────────────────────────
-// 🗄️  VERİTABANI
-// ───────────────────────────────────────────────
-const db = new QuickDB();
-
-// ───────────────────────────────────────────────
-// 🤖  CLIENT
-// ───────────────────────────────────────────────
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildModeration,
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-// XP cooldown map
-const xpCooldowns = new Collection();
-// Raid join tracker
+const db = new QuickDB();
+const PREFIX = "!";
+const COLORS = { green: 0x2ecc71, red: 0xe74c3c, yellow: 0xf1c40f, blue: 0x3498db };
+const xpCooldown = new Map();
 const recentJoins = [];
 
-// ╔══════════════════════════════════════════╗
-// ║           📦 YARDIMCI FONKSİYONLAR       ║
-// ╚══════════════════════════════════════════╝
+const e = (title, desc, color = COLORS.green) =>
+  new EmbedBuilder().setTitle(title).setDescription(desc).setColor(color).setFooter({ text: "⚔️ Castivol" }).setTimestamp();
 
-function embed(title, description, color = CONFIG.COLORS.PRIMARY) {
-  return new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(color)
-    .setTimestamp()
-    .setFooter({ text: "⚔️ Klan Bot" });
-}
-
-async function log(guild, content) {
-  if (!CONFIG.LOG_CHANNEL_ID) return;
-  const ch = guild.channels.cache.get(CONFIG.LOG_CHANNEL_ID);
-  if (ch) ch.send({ embeds: [content] }).catch(() => {});
-}
-
-function levelFromXP(xp) {
-  return Math.floor(xp / CONFIG.XP.LEVEL_MULTIPLIER);
-}
-
-function xpForNextLevel(level) {
-  return (level + 1) * CONFIG.XP.LEVEL_MULTIPLIER;
-}
-
-// ╔══════════════════════════════════════════╗
-// ║            🚀 READY EVENT                ║
-// ╚══════════════════════════════════════════╝
+const hasPerms = (member, perm) => member.permissions.has(perm);
+const xpLevel = (xp) => Math.floor(xp / 100);
 
 client.once("ready", () => {
-  console.log(`
-╔══════════════════════════════════════╗
-║  ✅  Bot Hazır: ${client.user.tag.padEnd(20)}║
-║  🌐  Sunucu: ${client.guilds.cache.size} sunucu              ║
-╚══════════════════════════════════════╝
-  `);
-  client.user.setActivity("!yardım | ⚔️ Klan", { type: 3 });
+  console.log(`✅ ${client.user.tag} hazır!`);
+  client.user.setActivity("!yardım | ⚔️ Castivol", { type: 3 });
 });
 
-// ╔══════════════════════════════════════════╗
-// ║         🛡️  RAID KORUMASI                ║
-// ╚══════════════════════════════════════════╝
-
+// RAID KORUMASI
 client.on("guildMemberAdd", async (member) => {
   const now = Date.now();
-
-  // Hesap yaşı kontrolü
-  const accountAgeDays = (now - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
-  if (accountAgeDays < CONFIG.RAID.MIN_ACCOUNT_AGE_DAYS) {
-    try {
-      await member.kick(`🛡️ Raid Koruması: Hesap çok yeni (${Math.floor(accountAgeDays)} gün)`);
-      await log(
-        member.guild,
-        embed(
-          "🛡️ Raid Koruması — Yeni Hesap Atıldı",
-          `**Kullanıcı:** ${member.user.tag}\n**Hesap Yaşı:** ${Math.floor(accountAgeDays)} gün\n**Sebep:** Minimum hesap yaşı sağlanamadı`,
-          CONFIG.COLORS.WARN
-        )
-      );
-    } catch {}
+  const ageDays = (now - member.user.createdTimestamp) / 86400000;
+  if (ageDays < 7) {
+    await member.kick("Raid Koruması: Hesap çok yeni").catch(() => {});
     return;
   }
-
-  // Hızlı join tespiti
   recentJoins.push(now);
-  const window = recentJoins.filter((t) => now - t < CONFIG.RAID.JOIN_WINDOW_MS);
-  if (window.length >= CONFIG.RAID.JOIN_THRESHOLD) {
-    await log(
-      member.guild,
-      embed(
-        "🚨 RAID ALARMI!",
-        `Son **${CONFIG.RAID.JOIN_WINDOW_MS / 1000} saniye** içinde **${window.length} kişi** katıldı!\nSunucuya raid yapılıyor olabilir! Lütfen kontrol et.`,
-        CONFIG.COLORS.ERROR
-      )
-    );
-    // Sunucuyu kilitle (verification level yükselt)
-    try {
-      await member.guild.setVerificationLevel(4, "Raid tespit edildi");
-    } catch {}
+  const recent = recentJoins.filter((t) => now - t < 10000);
+  if (recent.length >= 5) {
+    const logCh = member.guild.channels.cache.find((c) => c.name === "castivol-log");
+    if (logCh) logCh.send({ embeds: [e("🚨 RAİD ALARMI!", `${recent.length} kişi 10 saniyede katıldı!`, COLORS.red)] });
   }
-  // Eski kayıtları temizle
-  while (recentJoins.length && now - recentJoins[0] > CONFIG.RAID.JOIN_WINDOW_MS) {
-    recentJoins.shift();
-  }
+  while (recentJoins.length && now - recentJoins[0] > 10000) recentJoins.shift();
 });
 
-// ╔══════════════════════════════════════════╗
-// ║       💬 MESAJ EVENT — XP + KOMUTLAR     ║
-// ╚══════════════════════════════════════════╝
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot || !msg.guild) return;
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot || !message.guild) return;
-
-  // ─── XP SİSTEMİ ───
-  const uid = `${message.guild.id}_${message.author.id}`;
-  const lastXP = xpCooldowns.get(uid) || 0;
-  if (Date.now() - lastXP > CONFIG.XP.COOLDOWN_MS) {
-    xpCooldowns.set(uid, Date.now());
-    const currentXP = (await db.get(`xp_${uid}`)) || 0;
-    const newXP = currentXP + CONFIG.XP.PER_MESSAGE;
-    await db.set(`xp_${uid}`, newXP);
-
-    const oldLevel = levelFromXP(currentXP);
-    const newLevel = levelFromXP(newXP);
-    if (newLevel > oldLevel) {
-      message.channel.send({
-        embeds: [
-          embed(
-            "🎉 SEVİYE ATLADIN!",
-            `Tebrikler ${message.author}! **${newLevel}. seviyeye** ulaştın! 🏆\nSonraki seviye için: **${xpForNextLevel(newLevel) - newXP} XP** daha lazım.`,
-            CONFIG.COLORS.GOLD
-          ),
-        ],
-      });
-    }
+  // XP
+  const uid = `${msg.guild.id}_${msg.author.id}`;
+  if (!xpCooldown.has(uid) || Date.now() - xpCooldown.get(uid) > 60000) {
+    xpCooldown.set(uid, Date.now());
+    const xp = ((await db.get(`xp_${uid}`)) || 0) + 10;
+    const oldLvl = xpLevel(xp - 10), newLvl = xpLevel(xp);
+    await db.set(`xp_${uid}`, xp);
+    if (newLvl > oldLvl)
+      msg.channel.send({ embeds: [e("🎉 Seviye Atladın!", `${msg.author} → **${newLvl}. seviye**! 🏆`, COLORS.yellow)] });
   }
 
-  // ─── PREFIX KONTROLÜ ───
-  if (!message.content.startsWith(CONFIG.PREFIX)) return;
+  if (!msg.content.startsWith(PREFIX)) return;
+  const args = msg.content.slice(1).trim().split(/ +/);
+  const cmd = args.shift().toLowerCase();
 
-  const args = message.content.slice(CONFIG.PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  // ═══════════════════════════════════════════
-  //  📖  !yardım
-  // ═══════════════════════════════════════════
-  if (command === "yardım" || command === "yardim" || command === "help") {
-    const helpEmbed = new EmbedBuilder()
-      .setTitle("⚔️ Klan Bot — Komut Listesi")
-      .setColor(CONFIG.COLORS.PRIMARY)
-      .setThumbnail(client.user.displayAvatarURL())
-      .setTimestamp()
-      .setFooter({ text: "⚔️ Klan Bot • Prefix: !" })
-      .addFields(
-        {
-          name: "🛡️ Moderasyon",
-          value: [
-            "`!ban <@kullanıcı> [sebep]` — Kullanıcıyı banlar",
-            "`!kick <@kullanıcı> [sebep]` — Kullanıcıyı atar",
-            "`!mute <@kullanıcı> <süre> [sebep]` — Susturur (ör: 10m, 1h)",
-            "`!unmute <@kullanıcı>` — Susturmayı kaldırır",
-            "`!temizle <miktar>` — Mesajları temizler",
-            "`!uyar <@kullanıcı> [sebep]` — Uyarı verir",
-            "`!uyarlar <@kullanıcı>` — Uyarıları gösterir",
-          ].join("\n"),
-          inline: false,
-        },
-        {
-          name: "⚔️ Klan Yönetimi",
-          value: [
-            "`!kayıt <@kullanıcı> <isim>` — Klan üyesini kayıt eder",
-            "`!üye <@kullanıcı>` — Üye bilgilerini gösterir",
-            "`!üyeler` — Tüm klan üyelerini listeler",
-            "`!çıkar <@kullanıcı>` — Üyeyi klandan çıkarır",
-          ].join("\n"),
-          inline: false,
-        },
-        {
-          name: "🏆 XP & Sıralama",
-          value: [
-            "`!profil [@kullanıcı]` — XP ve seviyeni gösterir",
-            "`!sıralama` — Sunucu XP sıralaması",
-            "`!xpver <@kullanıcı> <miktar>` — (Yönetici) XP verir",
-            "`!xpset <@kullanıcı> <miktar>` — (Yönetici) XP ayarlar",
-          ].join("\n"),
-          inline: false,
-        },
-        {
-          name: "🎫 Ticket Sistemi",
-          value: [
-            "`!ticket` — Yeni destek bileti açar",
-            "`!kapat` — Ticketi kapatır (ticket kanalında)",
-          ].join("\n"),
-          inline: false,
-        },
-        {
-          name: "🛡️ Koruma",
-          value: [
-            "`!raidmod <aç/kapat>` — Raid korumasını ayarlar",
-            "`!kilitle` — Kanalı kilitler",
-            "`!aç` — Kanal kilidini açar",
-          ].join("\n"),
-          inline: false,
-        },
-        {
-          name: "ℹ️ Genel",
-          value: [
-            "`!ping` — Bot gecikmesini gösterir",
-            "`!sunucu` — Sunucu bilgileri",
-            "`!kullanıcı [@kullanıcı]` — Kullanıcı bilgileri",
-            "`!avatar [@kullanıcı]` — Avatar gösterir",
-          ].join("\n"),
-          inline: false,
-        }
-      );
-    return message.channel.send({ embeds: [helpEmbed] });
+  if (cmd === "yardım" || cmd === "yardim") {
+    return msg.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle("⚔️ Castivol Bot — Komutlar")
+          .setColor(COLORS.green)
+          .setThumbnail(client.user.displayAvatarURL())
+          .addFields(
+            { name: "🛡️ Moderasyon", value: "`!ban` `!kick` `!mute <süre>` `!unmute` `!temizle <n>` `!uyar` `!kilitle` `!aç`" },
+            { name: "⚔️ Klan", value: "`!kayıt @üye McAdı` `!üye` `!üyeler` `!çıkar`" },
+            { name: "🏆 XP", value: "`!profil` `!sıralama` `!xpver @üye <n>`" },
+            { name: "🎫 Ticket", value: "`!ticket` `!kapat`" },
+            { name: "ℹ️ Genel", value: "`!ping` `!sunucu` `!avatar`" }
+          )
+          .setFooter({ text: "⚔️ Castivol | Prefix: !" })
+          .setTimestamp(),
+      ],
+    });
   }
 
-  // ═══════════════════════════════════════════
-  //  🛡️  MODERASYON KOMUTLARI
-  // ═══════════════════════════════════════════
+  if (cmd === "ban") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.BanMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Ban yetkin yok.", COLORS.red)] });
+    const t = msg.mentions.members.first();
+    if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
+    await t.ban({ reason: args.slice(1).join(" ") || "Sebep yok" }).catch(() => {});
+    return msg.channel.send({ embeds: [e("🔨 Banlandı", `**${t.user.tag}** banlandı.`, COLORS.red)] });
+  }
 
-  // !ban
-  if (command === "ban") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Ban atma yetkin yok.", CONFIG.COLORS.ERROR)] });
+  if (cmd === "kick") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.KickMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kick yetkin yok.", COLORS.red)] });
+    const t = msg.mentions.members.first();
+    if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
+    await t.kick(args.slice(1).join(" ") || "Sebep yok").catch(() => {});
+    return msg.channel.send({ embeds: [e("👢 Atıldı", `**${t.user.tag}** atıldı.`, COLORS.yellow)] });
+  }
 
-    const target = message.mentions.members.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
+  if (cmd === "mute") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Mute yetkin yok.", COLORS.red)] });
+    const t = msg.mentions.members.first();
+    const dur = ms(args[1] || "");
+    if (!t || !dur) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!mute @kullanıcı 10m`", COLORS.red)] });
+    await t.timeout(dur).catch(() => {});
+    return msg.channel.send({ embeds: [e("🔇 Susturuldu", `**${t.user.tag}** → **${args[1]}** susturuldu.`, COLORS.yellow)] });
+  }
 
-    const reason = args.slice(1).join(" ") || "Sebep belirtilmedi";
-    try {
-      await target.ban({ reason });
-      const e = embed("🔨 Kullanıcı Banlandı", `**Kullanıcı:** ${target.user.tag}\n**Sebep:** ${reason}\n**Yetkili:** ${message.author.tag}`, CONFIG.COLORS.ERROR);
-      message.channel.send({ embeds: [e] });
-      await log(message.guild, e);
-    } catch (err) {
-      message.reply({ embeds: [embed("❌ Hata", `Ban atılamadı: ${err.message}`, CONFIG.COLORS.ERROR)] });
-    }
+  if (cmd === "unmute") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
+    const t = msg.mentions.members.first();
+    if (!t) return;
+    await t.timeout(null).catch(() => {});
+    return msg.channel.send({ embeds: [e("🔊 Susturma Kaldırıldı", `${t.user.tag} artık konuşabilir.`)] });
+  }
+
+  if (cmd === "temizle") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageMessages)) return;
+    const n = parseInt(args[0]);
+    if (!n || n < 1 || n > 99) return msg.reply({ embeds: [e("❌ Hata", "1-99 arası sayı gir.", COLORS.red)] });
+    await msg.channel.bulkDelete(n + 1, true).catch(() => {});
+    const r = await msg.channel.send({ embeds: [e("🗑️ Silindi", `**${n}** mesaj silindi.`, COLORS.blue)] });
+    setTimeout(() => r.delete().catch(() => {}), 3000);
     return;
   }
 
-  // !kick
-  if (command === "kick") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Kick atma yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
-
-    const reason = args.slice(1).join(" ") || "Sebep belirtilmedi";
-    try {
-      await target.kick(reason);
-      const e = embed("👢 Kullanıcı Atıldı", `**Kullanıcı:** ${target.user.tag}\n**Sebep:** ${reason}\n**Yetkili:** ${message.author.tag}`, CONFIG.COLORS.WARN);
-      message.channel.send({ embeds: [e] });
-      await log(message.guild, e);
-    } catch (err) {
-      message.reply({ embeds: [embed("❌ Hata", `Kick atılamadı: ${err.message}`, CONFIG.COLORS.ERROR)] });
-    }
-    return;
-  }
-
-  // !mute
-  if (command === "mute") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Mute yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
-
-    const duration = args[1] ? ms(args[1]) : null;
-    if (!duration) return message.reply({ embeds: [embed("❌ Hata", "Süre gir. Örnek: `!mute @kullanıcı 10m`", CONFIG.COLORS.ERROR)] });
-
-    const reason = args.slice(2).join(" ") || "Sebep belirtilmedi";
-    try {
-      await target.timeout(duration, reason);
-      const e = embed("🔇 Kullanıcı Susturuldu", `**Kullanıcı:** ${target.user.tag}\n**Süre:** ${args[1]}\n**Sebep:** ${reason}\n**Yetkili:** ${message.author.tag}`, CONFIG.COLORS.WARN);
-      message.channel.send({ embeds: [e] });
-      await log(message.guild, e);
-    } catch (err) {
-      message.reply({ embeds: [embed("❌ Hata", `Mute yapılamadı: ${err.message}`, CONFIG.COLORS.ERROR)] });
-    }
-    return;
-  }
-
-  // !unmute
-  if (command === "unmute") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Unmute yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
-
-    try {
-      await target.timeout(null);
-      message.channel.send({ embeds: [embed("🔊 Susturma Kaldırıldı", `${target.user.tag} artık konuşabilir.`, CONFIG.COLORS.PRIMARY)] });
-    } catch (err) {
-      message.reply({ embeds: [embed("❌ Hata", err.message, CONFIG.COLORS.ERROR)] });
-    }
-    return;
-  }
-
-  // !temizle
-  if (command === "temizle" || command === "clear") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Mesaj silme yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const amount = parseInt(args[0]);
-    if (!amount || amount < 1 || amount > 100)
-      return message.reply({ embeds: [embed("❌ Hata", "1 ile 100 arası bir sayı gir.", CONFIG.COLORS.ERROR)] });
-
-    try {
-      const deleted = await message.channel.bulkDelete(amount + 1, true);
-      const reply = await message.channel.send({ embeds: [embed("🗑️ Mesajlar Silindi", `**${deleted.size - 1}** mesaj silindi.`, CONFIG.COLORS.INFO)] });
-      setTimeout(() => reply.delete().catch(() => {}), 3000);
-    } catch (err) {
-      message.reply({ embeds: [embed("❌ Hata", err.message, CONFIG.COLORS.ERROR)] });
-    }
-    return;
-  }
-
-  // !uyar
-  if (command === "uyar" || command === "warn") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ModerateMembers))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Uyarı yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.users.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
-
-    const reason = args.slice(1).join(" ") || "Sebep belirtilmedi";
-    const key = `warns_${message.guild.id}_${target.id}`;
+  if (cmd === "uyar") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
+    const t = msg.mentions.users.first();
+    if (!t) return;
+    const key = `warns_${msg.guild.id}_${t.id}`;
     const warns = (await db.get(key)) || [];
-    warns.push({ reason, by: message.author.tag, date: new Date().toLocaleDateString("tr-TR") });
+    warns.push({ reason: args.slice(1).join(" ") || "Sebep yok", by: msg.author.tag });
     await db.set(key, warns);
-
-    const e = embed("⚠️ Kullanıcı Uyarıldı", `**Kullanıcı:** ${target.tag}\n**Sebep:** ${reason}\n**Toplam Uyarı:** ${warns.length}\n**Yetkili:** ${message.author.tag}`, CONFIG.COLORS.WARN);
-    message.channel.send({ embeds: [e] });
-    await log(message.guild, e);
-    return;
+    return msg.channel.send({ embeds: [e("⚠️ Uyarıldı", `${t.tag} uyarıldı. Toplam: **${warns.length}**`, COLORS.yellow)] });
   }
 
-  // !uyarlar
-  if (command === "uyarlar" || command === "warns") {
-    const target = message.mentions.users.first() || message.author;
-    const key = `warns_${message.guild.id}_${target.id}`;
-    const warns = (await db.get(key)) || [];
-
-    if (warns.length === 0)
-      return message.reply({ embeds: [embed("✅ Uyarı Yok", `${target.tag} hiç uyarı almamış.`, CONFIG.COLORS.PRIMARY)] });
-
-    const list = warns.map((w, i) => `**${i + 1}.** ${w.reason} — *${w.by}* (${w.date})`).join("\n");
-    message.channel.send({ embeds: [embed(`⚠️ ${target.tag} Uyarıları`, list, CONFIG.COLORS.WARN)] });
-    return;
+  if (cmd === "kilitle") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
+    return msg.channel.send({ embeds: [e("🔒 Kilitlendi", `${msg.channel} kanalı kilitlendi.`, COLORS.red)] });
   }
 
-  // !kilitle
-  if (command === "kilitle" || command === "lock") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageChannels))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Kanal yönetme yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false });
-    message.channel.send({ embeds: [embed("🔒 Kanal Kilitlendi", `${message.channel} kanalı kilitlendi. Mesaj gönderilemez.`, CONFIG.COLORS.ERROR)] });
-    return;
+  if (cmd === "aç" || cmd === "ac") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
+    await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
+    return msg.channel.send({ embeds: [e("🔓 Açıldı", `${msg.channel} kanalı açıldı.`)] });
   }
 
-  // !aç
-  if (command === "aç" || command === "unlock") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageChannels))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Kanal yönetme yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null });
-    message.channel.send({ embeds: [embed("🔓 Kanal Açıldı", `${message.channel} kanalı tekrar açık.`, CONFIG.COLORS.PRIMARY)] });
-    return;
+  if (cmd === "kayıt" || cmd === "kayit") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageRoles)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kayıt yetkin yok.", COLORS.red)] });
+    const t = msg.mentions.members.first();
+    const ign = args[1];
+    if (!t || !ign) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!kayıt @kullanıcı McAdı`", COLORS.red)] });
+    await db.set(`member_${msg.guild.id}_${t.id}`, { tag: t.user.tag, ign, date: new Date().toLocaleDateString("tr-TR") });
+    await t.setNickname(ign).catch(() => {});
+    return msg.channel.send({ embeds: [e("✅ Kayıt Edildi", `**${t.user.tag}** → Minecraft: \`${ign}\``)] });
   }
 
-  // ═══════════════════════════════════════════
-  //  ⚔️  KLAN YÖNETİMİ
-  // ═══════════════════════════════════════════
-
-  // !kayıt
-  if (command === "kayıt" || command === "kayit") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Kayıt yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    const ign = args[1]; // Minecraft kullanıcı adı
-    if (!target || !ign)
-      return message.reply({ embeds: [embed("❌ Hata", "Kullanım: `!kayıt @kullanıcı MinecraftAdı`", CONFIG.COLORS.ERROR)] });
-
-    await db.set(`member_${message.guild.id}_${target.id}`, {
-      tag: target.user.tag,
-      ign,
-      joinedAt: new Date().toLocaleDateString("tr-TR"),
-      by: message.author.tag,
+  if (cmd === "üye" || cmd === "uye") {
+    const t = msg.mentions.members.first() || msg.member;
+    const data = await db.get(`member_${msg.guild.id}_${t.id}`);
+    if (!data) return msg.reply({ embeds: [e("❌ Bulunamadı", "Bu kullanıcı klan üyesi değil.", COLORS.red)] });
+    const xp = (await db.get(`xp_${msg.guild.id}_${t.id}`)) || 0;
+    return msg.channel.send({
+      embeds: [new EmbedBuilder().setTitle(`⚔️ ${data.ign}`).setColor(COLORS.green).setThumbnail(t.user.displayAvatarURL())
+        .addFields(
+          { name: "Discord", value: data.tag, inline: true },
+          { name: "MC Adı", value: `\`${data.ign}\``, inline: true },
+          { name: "Seviye", value: `${xpLevel(xp)}`, inline: true },
+          { name: "XP", value: `${xp}`, inline: true },
+          { name: "Katılım", value: data.date, inline: true }
+        ).setFooter({ text: "⚔️ Castivol" }).setTimestamp()],
     });
-
-    try {
-      await target.setNickname(ign);
-    } catch {}
-
-    const e = embed("✅ Üye Kayıt Edildi", `**Discord:** ${target.user.tag}\n**Minecraft Adı:** \`${ign}\`\n**Kaydeden:** ${message.author.tag}`, CONFIG.COLORS.PRIMARY);
-    message.channel.send({ embeds: [e] });
-    return;
   }
 
-  // !üye
-  if (command === "üye" || command === "uye") {
-    const target = message.mentions.members.first() || message.member;
-    const data = await db.get(`member_${message.guild.id}_${target.id}`);
-    if (!data)
-      return message.reply({ embeds: [embed("❌ Bulunamadı", "Bu kullanıcı klan üyesi değil.", CONFIG.COLORS.ERROR)] });
+  if (cmd === "üyeler" || cmd === "uyeler") {
+    const all = await db.all();
+    const members = all.filter((k) => k.id.startsWith(`member_${msg.guild.id}_`));
+    if (!members.length) return msg.reply({ embeds: [e("📋 Üyeler", "Kayıtlı üye yok.", COLORS.blue)] });
+    const list = members.map((m, i) => `**${i + 1}.** \`${m.value.ign}\` — ${m.value.tag}`).join("\n");
+    return msg.channel.send({ embeds: [e(`⚔️ Castivol Üyeleri (${members.length})`, list)] });
+  }
 
-    const xp = (await db.get(`xp_${message.guild.id}_${target.id}`)) || 0;
-    const level = levelFromXP(xp);
+  if (cmd === "çıkar" || cmd === "cikar") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageRoles)) return;
+    const t = msg.mentions.members.first();
+    if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
+    await db.delete(`member_${msg.guild.id}_${t.id}`);
+    return msg.channel.send({ embeds: [e("🚪 Çıkarıldı", `${t.user.tag} klandan çıkarıldı.`, COLORS.yellow)] });
+  }
 
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`⚔️ ${data.ign} — Klan Üyesi`)
-          .setColor(CONFIG.COLORS.PRIMARY)
-          .setThumbnail(target.user.displayAvatarURL())
-          .addFields(
-            { name: "Discord", value: data.tag, inline: true },
-            { name: "Minecraft", value: `\`${data.ign}\``, inline: true },
-            { name: "Katılım", value: data.joinedAt, inline: true },
-            { name: "Seviye", value: `${level}`, inline: true },
-            { name: "XP", value: `${xp}`, inline: true },
-            { name: "Kaydeden", value: data.by, inline: true }
-          )
-          .setTimestamp()
-          .setFooter({ text: "⚔️ Klan Bot" }),
-      ],
+  if (cmd === "profil") {
+    const t = msg.mentions.members.first() || msg.member;
+    const xp = (await db.get(`xp_${msg.guild.id}_${t.id}`)) || 0;
+    const lvl = xpLevel(xp);
+    const bar = "█".repeat(Math.floor((xp % 100) / 5)) + "░".repeat(20 - Math.floor((xp % 100) / 5));
+    return msg.channel.send({
+      embeds: [new EmbedBuilder().setTitle(`🏆 ${t.user.username}`).setColor(COLORS.yellow).setThumbnail(t.user.displayAvatarURL())
+        .addFields(
+          { name: "Seviye", value: `${lvl}`, inline: true },
+          { name: "XP", value: `${xp}`, inline: true },
+          { name: "Sonraki", value: `${(lvl + 1) * 100 - xp} XP`, inline: true },
+          { name: "İlerleme", value: `\`[${bar}]\`` }
+        ).setFooter({ text: "⚔️ Castivol" }).setTimestamp()],
     });
-    return;
   }
 
-  // !üyeler
-  if (command === "üyeler" || command === "uyeler") {
-    const keys = await db.all();
-    const guildMembers = keys.filter((k) => k.id.startsWith(`member_${message.guild.id}_`));
-
-    if (!guildMembers.length)
-      return message.reply({ embeds: [embed("📋 Üye Listesi", "Henüz kayıtlı üye yok.", CONFIG.COLORS.INFO)] });
-
-    const list = guildMembers.map((m, i) => `**${i + 1}.** \`${m.value.ign}\` — ${m.value.tag}`).join("\n");
-    message.channel.send({ embeds: [embed(`⚔️ Klan Üyeleri (${guildMembers.length})`, list, CONFIG.COLORS.PRIMARY)] });
-    return;
-  }
-
-  // !çıkar
-  if (command === "çıkar" || command === "cikar") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageRoles))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Bu işlem için yetkin yok.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    if (!target) return message.reply({ embeds: [embed("❌ Hata", "Bir kullanıcı etiketle.", CONFIG.COLORS.ERROR)] });
-
-    await db.delete(`member_${message.guild.id}_${target.id}`);
-    message.channel.send({ embeds: [embed("🚪 Üye Çıkarıldı", `${target.user.tag} klandan çıkarıldı.`, CONFIG.COLORS.WARN)] });
-    return;
-  }
-
-  // ═══════════════════════════════════════════
-  //  🏆  XP & SIRALAMA
-  // ═══════════════════════════════════════════
-
-  // !profil
-  if (command === "profil" || command === "level") {
-    const target = message.mentions.members.first() || message.member;
-    const uid2 = `${message.guild.id}_${target.id}`;
-    const xp = (await db.get(`xp_${uid2}`)) || 0;
-    const level = levelFromXP(xp);
-    const nextXP = xpForNextLevel(level);
-    const progress = Math.floor((xp % CONFIG.XP.LEVEL_MULTIPLIER) / CONFIG.XP.LEVEL_MULTIPLIER * 20);
-    const bar = "█".repeat(progress) + "░".repeat(20 - progress);
-
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`🏆 ${target.user.username} — Profil`)
-          .setColor(CONFIG.COLORS.GOLD)
-          .setThumbnail(target.user.displayAvatarURL())
-          .addFields(
-            { name: "Seviye", value: `**${level}**`, inline: true },
-            { name: "Toplam XP", value: `**${xp}**`, inline: true },
-            { name: "Sonraki Seviye", value: `**${nextXP - xp} XP** lazım`, inline: true },
-            { name: "İlerleme", value: `\`[${bar}]\``, inline: false }
-          )
-          .setTimestamp()
-          .setFooter({ text: "⚔️ Klan Bot" }),
-      ],
-    });
-    return;
-  }
-
-  // !sıralama
-  if (command === "sıralama" || command === "siralama" || command === "top") {
-    const keys = await db.all();
-    const guildXP = keys
-      .filter((k) => k.id.startsWith(`xp_${message.guild.id}_`))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-
-    if (!guildXP.length)
-      return message.reply({ embeds: [embed("🏆 Sıralama", "Henüz XP kazanan yok.", CONFIG.COLORS.GOLD)] });
-
+  if (cmd === "sıralama" || cmd === "siralama") {
+    const all = await db.all();
+    const top = all.filter((k) => k.id.startsWith(`xp_${msg.guild.id}_`)).sort((a, b) => b.value - a.value).slice(0, 10);
+    if (!top.length) return msg.reply({ embeds: [e("🏆 Sıralama", "Henüz XP yok.", COLORS.yellow)] });
     const medals = ["🥇", "🥈", "🥉"];
-    const list = guildXP
-      .map((entry, i) => {
-        const userId = entry.id.split("_")[2];
-        const member = message.guild.members.cache.get(userId);
-        const name = member ? member.user.username : "Bilinmiyor";
-        const medal = medals[i] || `**${i + 1}.**`;
-        return `${medal} ${name} — **${entry.value} XP** (Seviye ${levelFromXP(entry.value)})`;
-      })
-      .join("\n");
-
-    message.channel.send({ embeds: [embed("🏆 XP Sıralaması — Top 10", list, CONFIG.COLORS.GOLD)] });
-    return;
+    const list = top.map((entry, i) => {
+      const id = entry.id.split("_")[2];
+      const name = msg.guild.members.cache.get(id)?.user.username || "Bilinmiyor";
+      return `${medals[i] || `**${i + 1}.**`} ${name} — **${entry.value} XP** (Seviye ${xpLevel(entry.value)})`;
+    }).join("\n");
+    return msg.channel.send({ embeds: [e("🏆 XP Sıralaması", list, COLORS.yellow)] });
   }
 
-  // !xpver
-  if (command === "xpver") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Admin yetkisi gerekli.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    const amount = parseInt(args[1]);
-    if (!target || isNaN(amount))
-      return message.reply({ embeds: [embed("❌ Hata", "Kullanım: `!xpver @kullanıcı <miktar>`", CONFIG.COLORS.ERROR)] });
-
-    const uid2 = `xp_${message.guild.id}_${target.id}`;
-    const current = (await db.get(uid2)) || 0;
-    await db.set(uid2, current + amount);
-    message.channel.send({ embeds: [embed("✅ XP Verildi", `${target.user.tag} kullanıcısına **${amount} XP** verildi.`, CONFIG.COLORS.PRIMARY)] });
-    return;
+  if (cmd === "xpver") {
+    if (!hasPerms(msg.member, PermissionsBitField.Flags.Administrator)) return;
+    const t = msg.mentions.members.first();
+    const n = parseInt(args[1]);
+    if (!t || isNaN(n)) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!xpver @kullanıcı 100`", COLORS.red)] });
+    const key = `xp_${msg.guild.id}_${t.id}`;
+    await db.set(key, ((await db.get(key)) || 0) + n);
+    return msg.channel.send({ embeds: [e("✅ XP Verildi", `${t.user.tag} → **+${n} XP**`)] });
   }
 
-  // !xpset
-  if (command === "xpset") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator))
-      return message.reply({ embeds: [embed("❌ Yetersiz Yetki", "Admin yetkisi gerekli.", CONFIG.COLORS.ERROR)] });
-
-    const target = message.mentions.members.first();
-    const amount = parseInt(args[1]);
-    if (!target || isNaN(amount))
-      return message.reply({ embeds: [embed("❌ Hata", "Kullanım: `!xpset @kullanıcı <miktar>`", CONFIG.COLORS.ERROR)] });
-
-    await db.set(`xp_${message.guild.id}_${target.id}`, amount);
-    message.channel.send({ embeds: [embed("✅ XP Ayarlandı", `${target.user.tag} XP'si **${amount}** olarak ayarlandı.`, CONFIG.COLORS.PRIMARY)] });
-    return;
-  }
-
-  // ═══════════════════════════════════════════
-  //  🎫  TICKET SİSTEMİ
-  // ═══════════════════════════════════════════
-
-  // !ticket
-  if (command === "ticket") {
-    const existing = message.guild.channels.cache.find(
-      (c) => c.name === `ticket-${message.author.username.toLowerCase().replace(/[^a-z0-9]/g, "")}`
-    );
-    if (existing)
-      return message.reply({ embeds: [embed("❌ Hata", `Zaten açık bir ticketin var: ${existing}`, CONFIG.COLORS.ERROR)] });
-
-    const ticketChannel = await message.guild.channels.create({
-      name: `ticket-${message.author.username.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+  if (cmd === "ticket") {
+    const exists = msg.guild.channels.cache.find((c) => c.name === `ticket-${msg.author.id}`);
+    if (exists) return msg.reply({ embeds: [e("❌ Hata", `Zaten açık ticketin var: ${exists}`, COLORS.red)] });
+    const ch = await msg.guild.channels.create({
+      name: `ticket-${msg.author.id}`,
       type: ChannelType.GuildText,
-      parent: CONFIG.TICKET_CATEGORY_ID || undefined,
       permissionOverwrites: [
-        { id: message.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        {
-          id: message.author.id,
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-        },
+        { id: msg.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: msg.author.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
       ],
     });
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("close_ticket").setLabel("🔒 Kapat").setStyle(ButtonStyle.Danger));
+    await ch.send({ embeds: [e("🎫 Destek Talebi", `Merhaba ${msg.author}! Sorununu yaz, ekip yardımcı olacak.`, COLORS.blue)], components: [row] });
+    return msg.reply({ embeds: [e("✅ Ticket Açıldı", `${ch} kanalı oluşturuldu.`)] });
+  }
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("close_ticket")
-        .setLabel("🔒 Ticketi Kapat")
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    await ticketChannel.send({
-      embeds: [
-        embed(
-          "🎫 Destek Talebi Oluşturuldu",
-          `Merhaba ${message.author}! 👋\n\nSorununu veya talebini açıkla, ekibimiz en kısa sürede yardımcı olacak.\n\n⏱️ Ortalama yanıt süresi: **< 24 saat**`,
-          CONFIG.COLORS.INFO
-        ),
-      ],
-      components: [row],
-    });
-
-    message.reply({ embeds: [embed("✅ Ticket Açıldı", `Ticketin oluşturuldu: ${ticketChannel}`, CONFIG.COLORS.PRIMARY)] });
+  if (cmd === "kapat") {
+    if (!msg.channel.name.startsWith("ticket-")) return msg.reply({ embeds: [e("❌ Hata", "Sadece ticket kanallarında çalışır.", COLORS.red)] });
+    await msg.channel.send({ embeds: [e("🔒 Kapatılıyor", "5 saniye içinde silinecek.", COLORS.yellow)] });
+    setTimeout(() => msg.channel.delete().catch(() => {}), 5000);
     return;
   }
 
-  // !kapat
-  if (command === "kapat" || command === "close") {
-    if (!message.channel.name.startsWith("ticket-"))
-      return message.reply({ embeds: [embed("❌ Hata", "Bu komut sadece ticket kanallarında çalışır.", CONFIG.COLORS.ERROR)] });
-
-    await message.channel.send({ embeds: [embed("🔒 Ticket Kapatılıyor", "Bu kanal 5 saniye içinde silinecek...", CONFIG.COLORS.WARN)] });
-    setTimeout(() => message.channel.delete().catch(() => {}), 5000);
-    return;
+  if (cmd === "ping") {
+    const s = await msg.reply({ embeds: [e("🏓 Pong!", "Hesaplanıyor...")] });
+    return s.edit({ embeds: [e("🏓 Pong!", `Bot: **${s.createdTimestamp - msg.createdTimestamp}ms** | API: **${Math.round(client.ws.ping)}ms**`, COLORS.blue)] });
   }
 
-  // ═══════════════════════════════════════════
-  //  ℹ️  GENEL KOMUTLAR
-  // ═══════════════════════════════════════════
-
-  // !ping
-  if (command === "ping") {
-    const sent = await message.reply({ embeds: [embed("🏓 Pong!", "Hesaplanıyor...", CONFIG.COLORS.INFO)] });
-    sent.edit({
-      embeds: [
-        embed(
-          "🏓 Pong!",
-          `**Bot Gecikmesi:** ${sent.createdTimestamp - message.createdTimestamp}ms\n**API Gecikmesi:** ${Math.round(client.ws.ping)}ms`,
-          CONFIG.COLORS.INFO
-        ),
-      ],
+  if (cmd === "sunucu") {
+    const g = msg.guild;
+    return msg.channel.send({
+      embeds: [new EmbedBuilder().setTitle(`🌐 ${g.name}`).setColor(COLORS.green).setThumbnail(g.iconURL())
+        .addFields(
+          { name: "Üyeler", value: `${g.memberCount}`, inline: true },
+          { name: "Kanallar", value: `${g.channels.cache.size}`, inline: true },
+          { name: "Sahip", value: `<@${g.ownerId}>`, inline: true }
+        ).setFooter({ text: "⚔️ Castivol" }).setTimestamp()],
     });
-    return;
   }
 
-  // !sunucu
-  if (command === "sunucu" || command === "server") {
-    const g = message.guild;
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`🌐 ${g.name}`)
-          .setColor(CONFIG.COLORS.PRIMARY)
-          .setThumbnail(g.iconURL())
-          .addFields(
-            { name: "Üye Sayısı", value: `${g.memberCount}`, inline: true },
-            { name: "Kanallar", value: `${g.channels.cache.size}`, inline: true },
-            { name: "Roller", value: `${g.roles.cache.size}`, inline: true },
-            { name: "Oluşturulma", value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true },
-            { name: "Sahip", value: `<@${g.ownerId}>`, inline: true },
-            { name: "Boost", value: `${g.premiumSubscriptionCount || 0}`, inline: true }
-          )
-          .setTimestamp()
-          .setFooter({ text: "⚔️ Klan Bot" }),
-      ],
-    });
-    return;
-  }
-
-  // !kullanıcı
-  if (command === "kullanıcı" || command === "kullanici" || command === "userinfo") {
-    const target = message.mentions.members.first() || message.member;
-    const u = target.user;
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`👤 ${u.tag}`)
-          .setColor(CONFIG.COLORS.INFO)
-          .setThumbnail(u.displayAvatarURL())
-          .addFields(
-            { name: "ID", value: u.id, inline: true },
-            { name: "Hesap Oluşturulma", value: `<t:${Math.floor(u.createdTimestamp / 1000)}:D>`, inline: true },
-            { name: "Sunucuya Katılma", value: `<t:${Math.floor(target.joinedTimestamp / 1000)}:D>`, inline: true },
-            { name: "Roller", value: target.roles.cache.filter((r) => r.id !== message.guild.id).map((r) => `<@&${r.id}>`).join(", ") || "Yok", inline: false }
-          )
-          .setTimestamp()
-          .setFooter({ text: "⚔️ Klan Bot" }),
-      ],
-    });
-    return;
-  }
-
-  // !avatar
-  if (command === "avatar") {
-    const target = message.mentions.users.first() || message.author;
-    message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle(`🖼️ ${target.username} — Avatar`)
-          .setImage(target.displayAvatarURL({ size: 512 }))
-          .setColor(CONFIG.COLORS.PRIMARY),
-      ],
-    });
-    return;
+  if (cmd === "avatar") {
+    const t = msg.mentions.users.first() || msg.author;
+    return msg.channel.send({ embeds: [new EmbedBuilder().setTitle(`🖼️ ${t.username}`).setImage(t.displayAvatarURL({ size: 512 })).setColor(COLORS.green)] });
   }
 });
 
-// ╔══════════════════════════════════════════╗
-// ║       🎫  TICKET BUTTON INTERACTION      ║
-// ╚══════════════════════════════════════════╝
-
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  if (interaction.customId === "close_ticket") {
-    if (!interaction.channel.name.startsWith("ticket-")) return;
-
-    await interaction.reply({ embeds: [embed("🔒 Kapatılıyor", "Ticket 5 saniye içinde silinecek...", CONFIG.COLORS.WARN)] });
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
-  }
+client.on("interactionCreate", async (i) => {
+  if (!i.isButton() || i.customId !== "close_ticket") return;
+  await i.reply({ embeds: [e("🔒 Kapatılıyor", "5 saniye içinde silinecek.", COLORS.yellow)] });
+  setTimeout(() => i.channel.delete().catch(() => {}), 5000);
 });
 
-// ╔══════════════════════════════════════════╗
-// ║              🚀  LOGIN                   ║
-// ╚══════════════════════════════════════════╝
-
-client.login(CONFIG.TOKEN);
+client.login(process.env.TOKEN);
