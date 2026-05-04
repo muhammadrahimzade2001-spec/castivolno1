@@ -1,8 +1,19 @@
 require("dotenv").config();
 const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { QuickDB } = require("quick.db");
+const Database = require("better-sqlite3");
 const ms = require("ms");
 
+// ── VERİTABANI ────────────────────────────────────────
+const sql = new Database("castivol.db");
+sql.exec("CREATE TABLE IF NOT EXISTS store (key TEXT PRIMARY KEY, value TEXT)");
+const db = {
+  get: (key) => { const r = sql.prepare("SELECT value FROM store WHERE key=?").get(key); return r ? JSON.parse(r.value) : null; },
+  set: (key, val) => sql.prepare("INSERT OR REPLACE INTO store (key,value) VALUES (?,?)").run(key, JSON.stringify(val)),
+  del: (key) => sql.prepare("DELETE FROM store WHERE key=?").run(key),
+  all: (prefix) => sql.prepare("SELECT key,value FROM store WHERE key LIKE ?").all(prefix + "%").map(r => ({ id: r.key, value: JSON.parse(r.value) })),
+};
+
+// ── CLIENT ────────────────────────────────────────────
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -13,8 +24,6 @@ const client = new Client({
   ],
 });
 
-const db = new QuickDB();
-const PREFIX = "!";
 const COLORS = { green: 0x2ecc71, red: 0xe74c3c, yellow: 0xf1c40f, blue: 0x3498db };
 const xpCooldown = new Map();
 const recentJoins = [];
@@ -22,19 +31,19 @@ const recentJoins = [];
 const e = (title, desc, color = COLORS.green) =>
   new EmbedBuilder().setTitle(title).setDescription(desc).setColor(color).setFooter({ text: "⚔️ Castivol" }).setTimestamp();
 
-const hasPerms = (member, perm) => member.permissions.has(perm);
+const hasPerm = (member, perm) => member.permissions.has(perm);
 const xpLevel = (xp) => Math.floor(xp / 100);
 
+// ── READY ─────────────────────────────────────────────
 client.once("ready", () => {
   console.log(`✅ ${client.user.tag} hazır!`);
   client.user.setActivity("!yardım | ⚔️ Castivol", { type: 3 });
 });
 
-// RAID KORUMASI
+// ── RAİD KORUMASI ─────────────────────────────────────
 client.on("guildMemberAdd", async (member) => {
   const now = Date.now();
-  const ageDays = (now - member.user.createdTimestamp) / 86400000;
-  if (ageDays < 7) {
+  if ((now - member.user.createdTimestamp) / 86400000 < 7) {
     await member.kick("Raid Koruması: Hesap çok yeni").catch(() => {});
     return;
   }
@@ -47,6 +56,7 @@ client.on("guildMemberAdd", async (member) => {
   while (recentJoins.length && now - recentJoins[0] > 10000) recentJoins.shift();
 });
 
+// ── MESAJLAR ──────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot || !msg.guild) return;
 
@@ -54,39 +64,35 @@ client.on("messageCreate", async (msg) => {
   const uid = `${msg.guild.id}_${msg.author.id}`;
   if (!xpCooldown.has(uid) || Date.now() - xpCooldown.get(uid) > 60000) {
     xpCooldown.set(uid, Date.now());
-    const xp = ((await db.get(`xp_${uid}`)) || 0) + 10;
-    const oldLvl = xpLevel(xp - 10), newLvl = xpLevel(xp);
-    await db.set(`xp_${uid}`, xp);
-    if (newLvl > oldLvl)
-      msg.channel.send({ embeds: [e("🎉 Seviye Atladın!", `${msg.author} → **${newLvl}. seviye**! 🏆`, COLORS.yellow)] });
+    const xp = (db.get(`xp_${uid}`) || 0) + 10;
+    const oldLvl = xpLevel(xp - 10);
+    db.set(`xp_${uid}`, xp);
+    if (xpLevel(xp) > oldLvl)
+      msg.channel.send({ embeds: [e("🎉 Seviye Atladın!", `${msg.author} → **${xpLevel(xp)}. seviye**! 🏆`, COLORS.yellow)] });
   }
 
-  if (!msg.content.startsWith(PREFIX)) return;
+  if (!msg.content.startsWith("!")) return;
   const args = msg.content.slice(1).trim().split(/ +/);
   const cmd = args.shift().toLowerCase();
 
+  // ── !yardım ──
   if (cmd === "yardım" || cmd === "yardim") {
     return msg.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle("⚔️ Castivol Bot — Komutlar")
-          .setColor(COLORS.green)
-          .setThumbnail(client.user.displayAvatarURL())
-          .addFields(
-            { name: "🛡️ Moderasyon", value: "`!ban` `!kick` `!mute <süre>` `!unmute` `!temizle <n>` `!uyar` `!kilitle` `!aç`" },
-            { name: "⚔️ Klan", value: "`!kayıt @üye McAdı` `!üye` `!üyeler` `!çıkar`" },
-            { name: "🏆 XP", value: "`!profil` `!sıralama` `!xpver @üye <n>`" },
-            { name: "🎫 Ticket", value: "`!ticket` `!kapat`" },
-            { name: "ℹ️ Genel", value: "`!ping` `!sunucu` `!avatar`" }
-          )
-          .setFooter({ text: "⚔️ Castivol | Prefix: !" })
-          .setTimestamp(),
-      ],
+      embeds: [new EmbedBuilder()
+        .setTitle("⚔️ Castivol Bot — Komutlar").setColor(COLORS.green).setThumbnail(client.user.displayAvatarURL())
+        .addFields(
+          { name: "🛡️ Moderasyon", value: "`!ban` `!kick` `!mute <süre>` `!unmute` `!temizle <n>` `!uyar` `!kilitle` `!aç`" },
+          { name: "⚔️ Klan", value: "`!kayıt @üye McAdı` `!üye` `!üyeler` `!çıkar`" },
+          { name: "🏆 XP", value: "`!profil` `!sıralama` `!xpver @üye <n>`" },
+          { name: "🎫 Ticket", value: "`!ticket` `!kapat`" },
+          { name: "ℹ️ Genel", value: "`!ping` `!sunucu` `!avatar`" }
+        ).setFooter({ text: "⚔️ Castivol | Prefix: !" }).setTimestamp()],
     });
   }
 
+  // ── MOD ──
   if (cmd === "ban") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.BanMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Ban yetkin yok.", COLORS.red)] });
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.BanMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Ban yetkin yok.", COLORS.red)] });
     const t = msg.mentions.members.first();
     if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
     await t.ban({ reason: args.slice(1).join(" ") || "Sebep yok" }).catch(() => {});
@@ -94,7 +100,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "kick") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.KickMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kick yetkin yok.", COLORS.red)] });
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.KickMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kick yetkin yok.", COLORS.red)] });
     const t = msg.mentions.members.first();
     if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
     await t.kick(args.slice(1).join(" ") || "Sebep yok").catch(() => {});
@@ -102,7 +108,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "mute") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Mute yetkin yok.", COLORS.red)] });
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ModerateMembers)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Mute yetkin yok.", COLORS.red)] });
     const t = msg.mentions.members.first();
     const dur = ms(args[1] || "");
     if (!t || !dur) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!mute @kullanıcı 10m`", COLORS.red)] });
@@ -111,7 +117,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "unmute") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
     const t = msg.mentions.members.first();
     if (!t) return;
     await t.timeout(null).catch(() => {});
@@ -119,7 +125,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "temizle") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageMessages)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageMessages)) return;
     const n = parseInt(args[0]);
     if (!n || n < 1 || n > 99) return msg.reply({ embeds: [e("❌ Hata", "1-99 arası sayı gir.", COLORS.red)] });
     await msg.channel.bulkDelete(n + 1, true).catch(() => {});
@@ -129,43 +135,44 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "uyar") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ModerateMembers)) return;
     const t = msg.mentions.users.first();
     if (!t) return;
     const key = `warns_${msg.guild.id}_${t.id}`;
-    const warns = (await db.get(key)) || [];
+    const warns = db.get(key) || [];
     warns.push({ reason: args.slice(1).join(" ") || "Sebep yok", by: msg.author.tag });
-    await db.set(key, warns);
+    db.set(key, warns);
     return msg.channel.send({ embeds: [e("⚠️ Uyarıldı", `${t.tag} uyarıldı. Toplam: **${warns.length}**`, COLORS.yellow)] });
   }
 
   if (cmd === "kilitle") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
     await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
     return msg.channel.send({ embeds: [e("🔒 Kilitlendi", `${msg.channel} kanalı kilitlendi.`, COLORS.red)] });
   }
 
   if (cmd === "aç" || cmd === "ac") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageChannels)) return;
     await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
     return msg.channel.send({ embeds: [e("🔓 Açıldı", `${msg.channel} kanalı açıldı.`)] });
   }
 
+  // ── KLAN ──
   if (cmd === "kayıt" || cmd === "kayit") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageRoles)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kayıt yetkin yok.", COLORS.red)] });
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageRoles)) return msg.reply({ embeds: [e("❌ Yetki Yok", "Kayıt yetkin yok.", COLORS.red)] });
     const t = msg.mentions.members.first();
     const ign = args[1];
     if (!t || !ign) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!kayıt @kullanıcı McAdı`", COLORS.red)] });
-    await db.set(`member_${msg.guild.id}_${t.id}`, { tag: t.user.tag, ign, date: new Date().toLocaleDateString("tr-TR") });
+    db.set(`member_${msg.guild.id}_${t.id}`, { tag: t.user.tag, ign, date: new Date().toLocaleDateString("tr-TR") });
     await t.setNickname(ign).catch(() => {});
     return msg.channel.send({ embeds: [e("✅ Kayıt Edildi", `**${t.user.tag}** → Minecraft: \`${ign}\``)] });
   }
 
   if (cmd === "üye" || cmd === "uye") {
     const t = msg.mentions.members.first() || msg.member;
-    const data = await db.get(`member_${msg.guild.id}_${t.id}`);
+    const data = db.get(`member_${msg.guild.id}_${t.id}`);
     if (!data) return msg.reply({ embeds: [e("❌ Bulunamadı", "Bu kullanıcı klan üyesi değil.", COLORS.red)] });
-    const xp = (await db.get(`xp_${msg.guild.id}_${t.id}`)) || 0;
+    const xp = db.get(`xp_${msg.guild.id}_${t.id}`) || 0;
     return msg.channel.send({
       embeds: [new EmbedBuilder().setTitle(`⚔️ ${data.ign}`).setColor(COLORS.green).setThumbnail(t.user.displayAvatarURL())
         .addFields(
@@ -179,24 +186,24 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "üyeler" || cmd === "uyeler") {
-    const all = await db.all();
-    const members = all.filter((k) => k.id.startsWith(`member_${msg.guild.id}_`));
+    const members = db.all(`member_${msg.guild.id}_`);
     if (!members.length) return msg.reply({ embeds: [e("📋 Üyeler", "Kayıtlı üye yok.", COLORS.blue)] });
     const list = members.map((m, i) => `**${i + 1}.** \`${m.value.ign}\` — ${m.value.tag}`).join("\n");
     return msg.channel.send({ embeds: [e(`⚔️ Castivol Üyeleri (${members.length})`, list)] });
   }
 
   if (cmd === "çıkar" || cmd === "cikar") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.ManageRoles)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.ManageRoles)) return;
     const t = msg.mentions.members.first();
     if (!t) return msg.reply({ embeds: [e("❌ Hata", "Kullanıcı etiketle.", COLORS.red)] });
-    await db.delete(`member_${msg.guild.id}_${t.id}`);
+    db.del(`member_${msg.guild.id}_${t.id}`);
     return msg.channel.send({ embeds: [e("🚪 Çıkarıldı", `${t.user.tag} klandan çıkarıldı.`, COLORS.yellow)] });
   }
 
+  // ── XP ──
   if (cmd === "profil") {
     const t = msg.mentions.members.first() || msg.member;
-    const xp = (await db.get(`xp_${msg.guild.id}_${t.id}`)) || 0;
+    const xp = db.get(`xp_${msg.guild.id}_${t.id}`) || 0;
     const lvl = xpLevel(xp);
     const bar = "█".repeat(Math.floor((xp % 100) / 5)) + "░".repeat(20 - Math.floor((xp % 100) / 5));
     return msg.channel.send({
@@ -211,8 +218,7 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "sıralama" || cmd === "siralama") {
-    const all = await db.all();
-    const top = all.filter((k) => k.id.startsWith(`xp_${msg.guild.id}_`)).sort((a, b) => b.value - a.value).slice(0, 10);
+    const top = db.all(`xp_${msg.guild.id}_`).sort((a, b) => b.value - a.value).slice(0, 10);
     if (!top.length) return msg.reply({ embeds: [e("🏆 Sıralama", "Henüz XP yok.", COLORS.yellow)] });
     const medals = ["🥇", "🥈", "🥉"];
     const list = top.map((entry, i) => {
@@ -224,15 +230,16 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (cmd === "xpver") {
-    if (!hasPerms(msg.member, PermissionsBitField.Flags.Administrator)) return;
+    if (!hasPerm(msg.member, PermissionsBitField.Flags.Administrator)) return;
     const t = msg.mentions.members.first();
     const n = parseInt(args[1]);
     if (!t || isNaN(n)) return msg.reply({ embeds: [e("❌ Hata", "Kullanım: `!xpver @kullanıcı 100`", COLORS.red)] });
     const key = `xp_${msg.guild.id}_${t.id}`;
-    await db.set(key, ((await db.get(key)) || 0) + n);
+    db.set(key, (db.get(key) || 0) + n);
     return msg.channel.send({ embeds: [e("✅ XP Verildi", `${t.user.tag} → **+${n} XP**`)] });
   }
 
+  // ── TİCKET ──
   if (cmd === "ticket") {
     const exists = msg.guild.channels.cache.find((c) => c.name === `ticket-${msg.author.id}`);
     if (exists) return msg.reply({ embeds: [e("❌ Hata", `Zaten açık ticketin var: ${exists}`, COLORS.red)] });
@@ -256,6 +263,7 @@ client.on("messageCreate", async (msg) => {
     return;
   }
 
+  // ── GENEL ──
   if (cmd === "ping") {
     const s = await msg.reply({ embeds: [e("🏓 Pong!", "Hesaplanıyor...")] });
     return s.edit({ embeds: [e("🏓 Pong!", `Bot: **${s.createdTimestamp - msg.createdTimestamp}ms** | API: **${Math.round(client.ws.ping)}ms**`, COLORS.blue)] });
@@ -279,6 +287,7 @@ client.on("messageCreate", async (msg) => {
   }
 });
 
+// ── TICKET BUTON ──────────────────────────────────────
 client.on("interactionCreate", async (i) => {
   if (!i.isButton() || i.customId !== "close_ticket") return;
   await i.reply({ embeds: [e("🔒 Kapatılıyor", "5 saniye içinde silinecek.", COLORS.yellow)] });
