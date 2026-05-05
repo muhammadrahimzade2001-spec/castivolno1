@@ -1,7 +1,8 @@
+cat > /home/********/index_castivol.js << 'ENDOFFILE'
 // ╔══════════════════════════════════════════════════╗
-// ║         IzaKaya Discord Bot — index.js           ║
-// ║          🍶 Anime Sohbet Sunucusu Botu           ║
-// ║              by Claude  •  v1.0                  ║
+// ║         CastiVol Discord Bot — index.js          ║
+// ║        ⛏️ Minecraft Klan Sunucusu Botu           ║
+// ║              by Claude  •  v2.0                  ║
 // ╚══════════════════════════════════════════════════╝
 
 const {
@@ -51,30 +52,30 @@ const RAID_BAN_LIMIT = 3;
 const RAID_DEL_LIMIT = 3;
 const RAID_WINDOW_MS = 10000;
 
-// ─── Renk Paleti (Anime / İzakaya Teması) ────────────────────────────────────
+// ─── Renk Paleti (Minecraft Teması) ──────────────────────────────────────────
 const COLORS = {
-  SAKURA:   0xFF6B9D,   // Pembe - ana renk
-  INDIGO:   0x4B0082,   // Koyu mor - vurgu
-  KITSUNE:  0xFF8C00,   // Turuncu altın - seviye/XP
-  YUKI:     0xA8D8EA,   // Buz mavisi - bilgi
-  MIDORI:   0x5CB85C,   // Yeşil - başarı
-  AKA:      0xE74C3C,   // Kırmızı - hata/ban
-  NEON:     0x00FFCC,   // Neon turkuaz - eglence
+  SAKURA:   0x5B8C3E,   // Creeper yeşili - ana renk
+  INDIGO:   0x1B3A6B,   // Koyu mavi - vurgu
+  KITSUNE:  0xFFD700,   // Altın sarısı - seviye/XP
+  YUKI:     0x00B5E2,   // Elmas mavisi - bilgi
+  MIDORI:   0x2ECC40,   // Yeşil - başarı
+  AKA:      0xFF4136,   // Redstone kırmızısı - hata/ban
+  NEON:     0x00FFCC,   // Zümrüt - eğlence
   MURASAKI: 0x9B59B6,   // Mor - özel
-  YORU:     0x1A1A2E,   // Gece mavisi - koyu arka plan
-  TSUKI:    0xF0E6FF,   // Ay ışığı - açık
+  YORU:     0x2C2F33,   // Koyu arka plan
+  TSUKI:    0xF0E6FF,   // Açık renk
 };
 
-// ─── Anime XP Unvanları ───────────────────────────────────────────────────────
+// ─── Minecraft XP Unvanları ───────────────────────────────────────────────────
 const UNVANLAR = [
-  { min: 1,  unvan: '🌸 Genin',          emoji: '🌸' },
-  { min: 5,  unvan: '⚔️ Chuunin',        emoji: '⚔️' },
-  { min: 10, unvan: '🔥 Jounin',          emoji: '🔥' },
-  { min: 20, unvan: '💫 ANBU',            emoji: '💫' },
-  { min: 35, unvan: '🌟 Kage',            emoji: '🌟' },
-  { min: 50, unvan: '⚡ Hokage',          emoji: '⚡' },
-  { min: 75, unvan: '🏯 Efsane Ninja',    emoji: '🏯' },
-  { min: 100, unvan: '🐉 Ejderha Lordu',  emoji: '🐉' },
+  { min: 1,   unvan: '🪵 Ahşap Kılıç',      emoji: '🪵' },
+  { min: 5,   unvan: '🪨 Taş Kılıç',        emoji: '🪨' },
+  { min: 10,  unvan: '⚙️ Demir Kılıç',      emoji: '⚙️' },
+  { min: 20,  unvan: '🥇 Altın Kılıç',      emoji: '🥇' },
+  { min: 35,  unvan: '💎 Elmas Kılıç',      emoji: '💎' },
+  { min: 50,  unvan: '⚡ Netherite Kılıç',  emoji: '⚡' },
+  { min: 75,  unvan: '🏯 Klan Savaşçısı',   emoji: '🏯' },
+  { min: 100, unvan: '🐉 Klan Efsanesi',    emoji: '🐉' },
 ];
 
 function getUnvan(level) {
@@ -107,27 +108,27 @@ const xpCooldown = new Map();
 
 // ─── Ticket Kategorileri ──────────────────────────────────────────────────────
 const TICKET_KATEGORILER = {
-  'genel_sohbet':   { label: '💬 Genel Yardım',       renk: COLORS.YUKI    },
-  'anime_oneri':    { label: '🎌 Anime Önerisi',       renk: COLORS.SAKURA  },
-  'sikayet':        { label: '🚨 Şikayet',             renk: COLORS.AKA     },
-  'ortak_izleme':   { label: '🎬 Ortak İzleme Talebi', renk: COLORS.MURASAKI},
-  'yetkili_basvuru':{ label: '🛡️ Yetkili Başvurusu',   renk: COLORS.KITSUNE },
-  'bug_report':     { label: '🐛 Hata Bildirimi',      renk: COLORS.NEON    },
-  'oneri':          { label: '✨ Sunucu Önerisi',       renk: COLORS.MIDORI  },
+  'genel_sohbet':    { label: '💬 Genel Yardım',        renk: COLORS.YUKI    },
+  'anime_oneri':     { label: '⚔️ Klan Alım',           renk: COLORS.KITSUNE },
+  'sikayet':         { label: '🚨 Şikayet',             renk: COLORS.AKA     },
+  'ortak_izleme':    { label: '🤝 Klan Merge',          renk: COLORS.MURASAKI},
+  'yetkili_basvuru': { label: '🛡️ Yetkili Başvurusu',   renk: COLORS.KITSUNE },
+  'bug_report':      { label: '🐛 Hata Bildirimi',      renk: COLORS.NEON    },
+  'oneri':           { label: '✨ Sunucu Önerisi',       renk: COLORS.MIDORI  },
 };
 
 const TICKET_ACIKLAMALAR = {
   genel_sohbet:
-    '💬 **Genel Destek**\n\nMerhaba! Sorununu veya talebini detaylıca anlat.\nEkibimiz en kısa sürede yardımcı olacak! 🍵',
+    '💬 **Genel Destek**\n\nMerhaba! Sorununu veya talebini detaylıca anlat.\nEkibimiz en kısa sürede yardımcı olacak! ⛏️',
   anime_oneri:
-    '🎌 **Anime Önerisi Formu**\n\nLütfen şu bilgileri paylaş:\n' +
-    '• Önerdiğin anime adı\n• Tür (shounen, isekai, romance vb.)\n• Kısa özet\n• Neden öneriyorsun?',
+    '⚔️ **Klan Alım Başvurusu**\n\nLütfen şu bilgileri paylaş:\n' +
+    '• IGN (Oyun adın)\n• Seviye ve ekipman durumun\n• Aktiflik saatin\n• Neden klana katılmak istiyorsun?',
   sikayet:
     '🚨 **Şikayet Bildirimi**\n\nLütfen şu bilgileri yaz:\n' +
     '• Şikayet ettiğin kullanıcı (@ ile)\n• Ne zaman oldu?\n• Ne yaşandı? (Detaylı anlat)\n• Varsa ekran görüntüleri',
   ortak_izleme:
-    '🎬 **Ortak İzleme Talebi**\n\nLütfen şu bilgileri yaz:\n' +
-    '• İzlemek istediğin anime/film\n• Tercih ettiğin tarih/saat\n• Bölüm aralığı (varsa)\n• Ek notlar',
+    '🤝 **Klan Merge Talebi**\n\nLütfen şu bilgileri yaz:\n' +
+    '• Klan adın ve üye sayısı\n• Klan seviyesi ve başarıları\n• Birleşme gerekçen\n• İletişim bilgilerin',
   yetkili_basvuru:
     '🛡️ **Yetkili Başvurusu**\n\nLütfen şu bilgileri yaz:\n' +
     '• Yaşın\n• Günlük aktiflik saatin\n• Daha önce yetkili oldun mu?\n• Neden yetkili olmak istiyorsun?\n• Sunucuya katkın ne olur?',
@@ -147,7 +148,7 @@ function embed(baslik, aciklama, renk = COLORS.SAKURA) {
     .setTitle(baslik)
     .setDescription(aciklama)
     .setColor(renk)
-    .setFooter({ text: '🍶 IzaKaya • Anime Sohbet Sunucusu' })
+    .setFooter({ text: '⛏️ CastiVol • Minecraft Klan Sunucusu' })
     .setTimestamp();
 }
 
@@ -156,7 +157,7 @@ function hata(msg) {
     .setTitle('❌  Hata')
     .setDescription(msg)
     .setColor(COLORS.AKA)
-    .setFooter({ text: '🍶 IzaKaya' })
+    .setFooter({ text: '⛏️ CastiVol' })
     .setTimestamp();
 }
 
@@ -165,17 +166,17 @@ function basari(msg) {
     .setTitle('✅  Başarılı')
     .setDescription(msg)
     .setColor(COLORS.MIDORI)
-    .setFooter({ text: '🍶 IzaKaya' })
+    .setFooter({ text: '⛏️ CastiVol' })
     .setTimestamp();
 }
 
-// ─── Rastgele Anime Gifs (seviye atlama için) ─────────────────────────────────
+// ─── Rastgele Seviye Atlama Mesajları ─────────────────────────────────────────
 const KUTLAMA_MESAJLARI = [
-  '**Nakama!** Seviye atladın! 🎉',
-  '**Sugoi!** Yeni seviyeye ulaştın! ✨',
-  '**Yatta!** Tebrikler senpai! 🌸',
-  '**Nani?!** Bu kadar hızlı büyüdün mü? 😲',
-  '**Ore wa saijaku!** Güçleniyorsun! 💪',
+  '**Harika!** Yeni bir seviyeye ulaştın! 🎉',
+  '**Tebrikler!** Daha da güçleniyorsun! ⚔️',
+  '**Bravo!** Klan sana değer katıyor! 💎',
+  '**Woah!** Bu kadar hızlı mı büyüdün? 😲',
+  '**Evet!** Efsane olmaya devam et! 🏆',
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -183,10 +184,10 @@ const KUTLAMA_MESAJLARI = [
 // ══════════════════════════════════════════════════════════════════════════════
 client.once('ready', () => {
   console.log(`\n╔══════════════════════════════════════╗`);
-  console.log(`║  🍶 IzaKaya Bot Aktif!               ║`);
+  console.log(`║  ⛏️  CastiVol Bot Aktif!              ║`);
   console.log(`║  Kullanici: ${client.user.tag.padEnd(24)}║`);
   console.log(`╚══════════════════════════════════════╝\n`);
-  client.user.setActivity('🎌 IzaKaya | !yardim', { type: 0 });
+  client.user.setActivity('⛏️ CastiVol | !yardim', { type: 0 });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -201,9 +202,9 @@ client.on('messageCreate', async (message) => {
     const uyariMsg = await message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setDescription(`⚠️ ${message.author} saygısız dil kullandın! Mesajın silindi. Lütfen kurallara uy. 🌸`)
+          .setDescription(`⚠️ ${message.author} saygısız dil kullandın! Mesajın silindi. Lütfen kurallara uy. ⛏️`)
           .setColor(COLORS.KITSUNE)
-          .setFooter({ text: '🍶 IzaKaya • Küfür Filtresi' }),
+          .setFooter({ text: '⛏️ CastiVol • Küfür Filtresi' }),
       ],
     });
     setTimeout(() => uyariMsg.delete().catch(() => {}), 5000);
@@ -235,7 +236,7 @@ client.on('messageCreate', async (message) => {
             )
             .setColor(COLORS.KITSUNE)
             .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: '🍶 IzaKaya • Seviye Sistemi' })
+            .setFooter({ text: '⛏️ CastiVol • Seviye Sistemi' })
             .setTimestamp(),
         ],
       });
@@ -261,8 +262,8 @@ client.on('messageCreate', async (message) => {
     return message.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle(`🏯  ${g.name}`)
-          .setDescription('*Anime severlerin buluşma noktası!*')
+          .setTitle(`🏰  ${g.name}`)
+          .setDescription('*Minecraft klan savaşçılarının buluşma noktası!*')
           .setThumbnail(g.iconURL({ dynamic: true }))
           .addFields(
             { name: '👥 Üye Sayısı',  value: `${g.memberCount}`,                              inline: true },
@@ -273,7 +274,7 @@ client.on('messageCreate', async (message) => {
             { name: '😀 Emoji',       value: `${g.emojis.cache.size}`,                        inline: true },
           )
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: '🍶 IzaKaya • Anime Sohbet Sunucusu' })
+          .setFooter({ text: '⛏️ CastiVol • Minecraft Klan Sunucusu' })
           .setTimestamp(),
       ],
     });
@@ -287,7 +288,7 @@ client.on('messageCreate', async (message) => {
           .setTitle(`🖼️  ${hedef.username} — Avatar`)
           .setImage(hedef.displayAvatarURL({ dynamic: true, size: 512 }))
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: '🍶 IzaKaya' })
+          .setFooter({ text: '⛏️ CastiVol' })
           .setTimestamp(),
       ],
     });
@@ -311,7 +312,7 @@ client.on('messageCreate', async (message) => {
             { name: `${unvan.emoji} Unvan`, value: unvan.unvan,                                             inline: true },
           )
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: '🍶 IzaKaya • Anime Sohbet Sunucusu' })
+          .setFooter({ text: '⛏️ CastiVol • Minecraft Klan Sunucusu' })
           .setTimestamp(),
       ],
     });
@@ -321,23 +322,23 @@ client.on('messageCreate', async (message) => {
     return message.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle('📜  IzaKaya Sunucu Kuralları')
+          .setTitle('📜  CastiVol Sunucu Kuralları')
           .setDescription(
-            '> *"Nakama\'ya saygı göster, dostluk kazanırsın."*\n\n' +
-            '**1.** 🌸 Herkese saygılı ol, hakaret yasak.\n' +
+            '> *"Güçlü savaşçılar kurallara uyar, zayıflar çiğner."*\n\n' +
+            '**1.** ⚔️ Herkese saygılı ol, hakaret yasak.\n' +
             '**2.** 🚫 Spam ve flood yasaktır.\n' +
             '**3.** 📢 İzinsiz reklam/davet yasaktır.\n' +
-            '**4.** 🔞 NSFW içerik sadece belirlenmiş kanallarda.\n' +
+            '**4.** 🔞 NSFW içerik kesinlikle yasaktır.\n' +
             '**5.** 🛡️ Yetkililerin kararlarına uy.\n' +
             '**6.** 🎭 Troll ve provokasyon yasaktır.\n' +
-            '**7.** 🎌 Spoiler içerikleri || arasında yaz!\n' +
-            '**8.** 💬 Kanalları amacına uygun kullan.\n' +
+            '**7.** 💬 Spoiler içerikleri || arasında yaz!\n' +
+            '**8.** 🏰 Kanalları amacına uygun kullan.\n' +
             '**9.** 🤝 Kural ihlalleri uyarı/ban ile sonuçlanır.\n\n' +
-            '> Keyifli sohbetler dileriz! 🍵'
+            '> İyi oyunlar ve başarılı baskınlar! ⛏️'
           )
           .setColor(COLORS.MURASAKI)
           .setThumbnail(message.guild.iconURL({ dynamic: true }))
-          .setFooter({ text: '🍶 IzaKaya • Sunucu Kuralları' })
+          .setFooter({ text: '⛏️ CastiVol • Sunucu Kuralları' })
           .setTimestamp(),
       ],
     });
@@ -375,11 +376,11 @@ client.on('messageCreate', async (message) => {
       tip = 'Acil';
       duyuruRenk = COLORS.AKA;
       duyuruBaslik = '🚨  ACİL DUYURU';
-    } else if (args[0] === '-anime') {
+    } else if (args[0] === '-etkinlik') {
       metin = args.slice(1).join(' ');
-      tip = 'Anime';
-      duyuruRenk = COLORS.SAKURA;
-      duyuruBaslik = '🎌  Anime Duyurusu';
+      tip = 'Etkinlik';
+      duyuruRenk = COLORS.NEON;
+      duyuruBaslik = '🎮  Etkinlik Duyurusu';
     } else {
       metin = args.join(' ');
     }
@@ -390,7 +391,7 @@ client.on('messageCreate', async (message) => {
       '`!duyuru -rol @rol <metin>` — Role özel\n' +
       '`!duyuru -sessiz <metin>` — Pingsiz\n' +
       '`!duyuru -acil <metin>` — Acil kırmızı\n' +
-      '`!duyuru -anime <metin>` — Anime duyurusu 🎌'
+      '`!duyuru -etkinlik <metin>` — Etkinlik duyurusu 🎮'
     )] });
 
     message.delete().catch(() => {});
@@ -407,7 +408,7 @@ client.on('messageCreate', async (message) => {
             { name: '📋 Tip',     value: tip,                                        inline: true },
             { name: '📅 Tarih',   value: `<t:${Math.floor(Date.now() / 1000)}:F>`,  inline: true },
           )
-          .setFooter({ text: `🍶 IzaKaya • ${tip} Duyuru` })
+          .setFooter({ text: `⛏️ CastiVol • ${tip} Duyuru` })
           .setTimestamp(),
       ],
     });
@@ -556,7 +557,7 @@ client.on('messageCreate', async (message) => {
         new EmbedBuilder()
           .setDescription(metin)
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: `🍶 IzaKaya • ${message.author.tag}` })
+          .setFooter({ text: `⛏️ CastiVol • ${message.author.tag}` })
           .setTimestamp(),
       ],
     });
@@ -580,13 +581,13 @@ client.on('messageCreate', async (message) => {
           .setTitle(`${unvan.emoji}  ${hedef.username} — Profil`)
           .setThumbnail(hedef.displayAvatarURL({ dynamic: true }))
           .addFields(
-            { name: '🏅 Seviye',          value: `**${u.level}**`,          inline: true },
-            { name: `${unvan.emoji} Unvan`, value: unvan.unvan,              inline: true },
-            { name: '💬 Mesaj Sayısı',    value: `${u.mesajSayisi || 0}`,   inline: true },
-            { name: '✨ XP Barı',         value: `\`[${bar}]\` ${u.xp}/${needed}`, inline: false },
+            { name: '🏅 Seviye',            value: `**${u.level}**`,          inline: true },
+            { name: `${unvan.emoji} Unvan`,  value: unvan.unvan,               inline: true },
+            { name: '💬 Mesaj Sayısı',       value: `${u.mesajSayisi || 0}`,   inline: true },
+            { name: '✨ XP Barı',            value: `\`[${bar}]\` ${u.xp}/${needed}`, inline: false },
           )
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: '🍶 IzaKaya • Profil Sistemi' })
+          .setFooter({ text: '⛏️ CastiVol • Profil Sistemi' })
           .setTimestamp(),
       ],
     });
@@ -638,56 +639,65 @@ client.on('messageCreate', async (message) => {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  ANİME KOMUTLARI (Özel)
+  //  MİNECRAFT KOMUTLARI (Özel)
   // ══════════════════════════════════════════════════════════════════════════
 
-  if (komut === 'waifu') {
-    const waifular = [
-      'Zero Two (Darling in the FranXX) 💖',
-      'Rem (Re:Zero) 💙',
-      'Asuna (Sword Art Online) ⚔️',
-      'Nezuko (Demon Slayer) 🌸',
-      'Mikasa (Attack on Titan) 💪',
-      'Hinata (Naruto) 🌺',
-      'Erza (Fairy Tail) 🔴',
-      'Violet (Violet Evergarden) 💜',
-      'Miku (Quintessential Quintuplets) 🎵',
-      'Yor (Spy x Family) 🌹',
-    ];
-    const secilen = waifular[Math.floor(Math.random() * waifular.length)];
-    return message.reply({ embeds: [embed('💝  Günün Waifusu', `${message.author.username}'nin günün waifusu:\n\n**${secilen}**`, COLORS.SAKURA)] });
-  }
-
-  if (komut === 'husbando') {
-    const husbanolar = [
-      'Levi Ackerman (Attack on Titan) ⚔️',
-      'Itachi Uchiha (Naruto) 👁️',
-      'Gojo Satoru (Jujutsu Kaisen) 🌟',
-      'Roronoa Zoro (One Piece) 🗡️',
-      'Edward Elric (Fullmetal Alchemist) ✨',
-      'Killua (Hunter x Hunter) ⚡',
-      'Todoroki (My Hero Academia) 🔥❄️',
-      'Yato (Noragami) 💙',
-      'Kirito (Sword Art Online) ⚫',
-      'Spike Spiegel (Cowboy Bebop) 🚀',
-    ];
-    const secilen = husbanolar[Math.floor(Math.random() * husbanolar.length)];
-    return message.reply({ embeds: [embed('💙  Günün Husbandosu', `${message.author.username}'nin günün husbandosu:\n\n**${secilen}**`, COLORS.INDIGO)] });
-  }
-
-  if (komut === 'anime-bilgi') {
+  if (komut === 'minecraft-ip') {
     return message.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle('🎌  Anime Komutları')
-          .setDescription('IzaKaya\'nın özel anime komutları!')
+          .setTitle('🌍  CastiVol Minecraft Sunucusu')
+          .setDescription('> Sunucuya katılmak için aşağıdaki IP\'yi kullan!')
           .addFields(
-            { name: '💝 Waifu/Husbando', value: '`!waifu` — Günün waifusunu öğren\n`!husbando` — Günün husbandosunu öğren' },
-            { name: '🎲 Eğlence',        value: '`!zar` `!yazi-tura` `!8top` `!saat`' },
-            { name: '📊 Anket',          value: '`!anket <soru>` — Anket oluştur' },
+            { name: '🖥️ IP Adresi', value: '`mc.castivol.net`', inline: true },
+            { name: '🔌 Port',       value: '`25565`',           inline: true },
+            { name: '🎮 Versiyon',   value: '`1.21.x`',          inline: true },
+          )
+          .setColor(COLORS.NEON)
+          .setFooter({ text: '⛏️ CastiVol • Minecraft Sunucusu' })
+          .setTimestamp(),
+      ],
+    });
+  }
+
+  if (komut === 'silah') {
+    const silahlar = [
+      '💎 Elmas Kılıç — Keskinlik V, Ateş Yönü II',
+      '🪓 Netherite Balta — Keskinlik IV, Verimlilik V',
+      '🏹 Fantom Yayı — Güç V, Sonsuzluk I',
+      '⚔️ Elmas Kılıç — Soymak III, Hız Kesme II',
+      '🗡️ Netherite Kılıç — Keskinlik V, Parçalama I',
+      '🪃 Trident — Bağlılık III, Riptide II',
+    ];
+    const secilen = silahlar[Math.floor(Math.random() * silahlar.length)];
+    return message.reply({ embeds: [embed('⚔️  Günün Silahı', `${message.author.username}'nin bugünkü silahı:\n\n**${secilen}**`, COLORS.SAKURA)] });
+  }
+
+  if (komut === 'zirh') {
+    const zirhlar = [
+      '💎 Full Elmas Zırh — Koruma IV',
+      '⚫ Full Netherite Zırh — Koruma IV, Kalemkarlık III',
+      '🟡 Altın Zırh — Ateş Koruması IV',
+      '⚙️ Full Demir Zırh — Projektil Koruması IV',
+      '💎 Elmas + Netherite Karma — En İyi Set',
+    ];
+    const secilen = zirhlar[Math.floor(Math.random() * zirhlar.length)];
+    return message.reply({ embeds: [embed('🛡️  Günün Zırhı', `${message.author.username}'nin bugünkü zırhı:\n\n**${secilen}**`, COLORS.YUKI)] });
+  }
+
+  if (komut === 'mc-bilgi') {
+    return message.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle('⛏️  Minecraft Komutları')
+          .setDescription('CastiVol\'un özel Minecraft komutları!')
+          .addFields(
+            { name: '🌍 Sunucu',  value: '`!minecraft-ip` — Sunucu IP\'sini göster' },
+            { name: '⚔️ Eğlence', value: '`!silah` — Günün silahını öğren\n`!zirh` — Günün zırhını öğren' },
+            { name: '🎲 Diğer',   value: '`!zar` `!yazi-tura` `!8top` `!saat`' },
           )
           .setColor(COLORS.SAKURA)
-          .setFooter({ text: '🍶 IzaKaya' })
+          .setFooter({ text: '⛏️ CastiVol' })
           .setTimestamp(),
       ],
     });
@@ -703,14 +713,14 @@ client.on('messageCreate', async (message) => {
 
     const menu = new StringSelectMenuBuilder()
       .setCustomId('ticket_kategori_sec')
-      .setPlaceholder('🎌 Ticket kategorini seç...')
+      .setPlaceholder('⛏️ Ticket kategorini seç...')
       .addOptions(
         new StringSelectMenuOptionBuilder()
           .setLabel('Genel Yardım').setDescription('Genel sorular ve yardım talebi').setValue('genel_sohbet').setEmoji('💬'),
         new StringSelectMenuOptionBuilder()
-          .setLabel('Anime Önerisi').setDescription('Anime önerin var mı? Paylaş!').setValue('anime_oneri').setEmoji('🎌'),
+          .setLabel('Klan Alım').setDescription('Klana katılmak istiyorum').setValue('anime_oneri').setEmoji('⚔️'),
         new StringSelectMenuOptionBuilder()
-          .setLabel('Ortak İzleme').setDescription('Birlikte anime izleyelim!').setValue('ortak_izleme').setEmoji('🎬'),
+          .setLabel('Klan Merge').setDescription('Klan birleşme talebi').setValue('ortak_izleme').setEmoji('🤝'),
         new StringSelectMenuOptionBuilder()
           .setLabel('Yetkili Başvurusu').setDescription('Sunucuda yetkili olmak istiyorum').setValue('yetkili_basvuru').setEmoji('🛡️'),
         new StringSelectMenuOptionBuilder()
@@ -726,15 +736,15 @@ client.on('messageCreate', async (message) => {
     await message.channel.send({
       embeds: [
         new EmbedBuilder()
-          .setTitle('🎫  IzaKaya Destek Merkezi')
+          .setTitle('🎫  CastiVol Destek Merkezi')
           .setDescription(
-            '**Merhaba, Nakama!** 🌸\n\n' +
+            '**Merhaba, Savaşçı!** ⚔️\n\n' +
             'Aşağıdaki menüden kategoriyi seçerek özel ticket açabilirsin.\n' +
             'Ekibimiz en kısa sürede seninle ilgilenecek!\n\n' +
             '━━━━━━━━━━━━━━━━━━━━━━\n' +
             '💬 **Genel Yardım** — Sorular & talepler\n' +
-            '🎌 **Anime Önerisi** — Anime önerin mi var?\n' +
-            '🎬 **Ortak İzleme** — Birlikte anime izleyelim\n' +
+            '⚔️ **Klan Alım** — Klana katılmak istiyorum\n' +
+            '🤝 **Klan Merge** — Klan birleşme talebi\n' +
             '🛡️ **Yetkili Başvurusu** — Ekibe katıl\n' +
             '🚨 **Şikayet** — Kullanıcı şikayeti\n' +
             '🐛 **Hata Bildirimi** — Teknik sorunlar\n' +
@@ -744,7 +754,7 @@ client.on('messageCreate', async (message) => {
           )
           .setColor(COLORS.SAKURA)
           .setThumbnail(message.guild.iconURL({ dynamic: true }))
-          .setFooter({ text: '🍶 IzaKaya • Destek Sistemi' })
+          .setFooter({ text: '⛏️ CastiVol • Destek Sistemi' })
           .setTimestamp(),
       ],
       components: [row],
@@ -772,8 +782,8 @@ client.on('messageCreate', async (message) => {
     const soru = args.join(' ');
     if (!soru) return message.reply({ embeds: [hata('`!8top <soru>`')] });
     const cevaplar = [
-      'Kesinlikle evet! ✅', 'Evet! ✅', 'Bence evet! 🌸',
-      'Şüpheli... 🌀', 'Belki! 🌙', 'Emin değilim 😶',
+      'Kesinlikle evet! ✅', 'Evet! ✅', 'Bence evet! 💎',
+      'Şüpheli... 🌀', 'Belki! ⚗️', 'Emin değilim 😶',
       'Hayır! ❌', 'Kesinlikle hayır! ❌', 'İmkansız! 🙅',
     ];
     const cevap = cevaplar[Math.floor(Math.random() * cevaplar.length)];
@@ -792,8 +802,8 @@ client.on('messageCreate', async (message) => {
     return message.reply({
       embeds: [
         new EmbedBuilder()
-          .setTitle('🍶  IzaKaya Komut Listesi')
-          .setDescription('*Merhaba Nakama! İşte kullanabileceğin tüm komutlar:*')
+          .setTitle('⛏️  CastiVol Komut Listesi')
+          .setDescription('*Merhaba Savaşçı! İşte kullanabileceğin tüm komutlar:*')
           .setColor(COLORS.SAKURA)
           .setThumbnail(message.guild.iconURL({ dynamic: true }))
           .addFields(
@@ -808,21 +818,21 @@ client.on('messageCreate', async (message) => {
                 '`!duyuru -rol @rol <metin>` — Role özel\n' +
                 '`!duyuru -sessiz <metin>` — Pingsiz\n' +
                 '`!duyuru -acil <metin>` — Acil kırmızı\n' +
-                '`!duyuru -anime <metin>` — Anime duyurusu 🎌',
+                '`!duyuru -etkinlik <metin>` — Etkinlik duyurusu 🎮',
             },
             {
               name: '🎫 Ticket Sistemi',
               value:
                 '`!ticket-kur` — Paneli kur (Admin)\n' +
-                'Kategoriler: Genel • Anime Önerisi • Ortak İzleme • Yetkili • Şikayet • Bug • Öneri',
+                'Kategoriler: Genel • Klan Alım • Klan Merge • Yetkili • Şikayet • Bug • Öneri',
             },
             {
               name: '✨ XP & Profil',
               value: '`!profil [@kullanici]` `!siralama` `!xpver` `!xpcikar` `!xpsifirla`',
             },
             {
-              name: '🎌 Anime Komutları',
-              value: '`!waifu` `!husbando` `!anime-bilgi`',
+              name: '⛏️ Minecraft Komutları',
+              value: '`!minecraft-ip` `!silah` `!zirh` `!mc-bilgi`',
             },
             {
               name: '🌍 Genel',
@@ -833,7 +843,7 @@ client.on('messageCreate', async (message) => {
               value: '`!zar [yüz]` `!yazi-tura` `!8top <soru>`',
             },
           )
-          .setFooter({ text: '🍶 IzaKaya • Prefix: ! • Iyi sohbetler!' })
+          .setFooter({ text: '⛏️ CastiVol • Prefix: ! • İyi oyunlar!' })
           .setTimestamp(),
       ],
     });
@@ -851,7 +861,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const secilen  = interaction.values[0];
     const kategori = TICKET_KATEGORILER[secilen];
-    const kanalAdi = `🎫-${secilen.replace(/_/g, '-')}-${interaction.user.id}`;
+    const kanalAdi = `ticket-${secilen.replace(/_/g, '-')}-${interaction.user.id}`;
 
     // Zaten açık ticket var mı?
     const mevcutKanal = interaction.guild.channels.cache.find(c => c.name === kanalAdi);
@@ -912,7 +922,7 @@ client.on('interactionCreate', async (interaction) => {
             { name: '📅 Açılış',    value: `<t:${Math.floor(Date.now() / 1000)}:F>`,    inline: false },
           )
           .setColor(kategori.renk)
-          .setFooter({ text: '🍶 IzaKaya • Ticket Sistemi | Sahiplenmek için butona bas' })
+          .setFooter({ text: '⛏️ CastiVol • Ticket Sistemi | Sahiplenmek için butona bas' })
           .setTimestamp(),
       ],
       components: [butonRow],
@@ -955,7 +965,7 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
-          .setDescription(`✋ Bu ticket **${interaction.user}** tarafından sahiplenildi! 🌸`)
+          .setDescription(`✋ Bu ticket **${interaction.user}** tarafından sahiplenildi! ⚔️`)
           .setColor(COLORS.MIDORI),
       ],
     });
@@ -966,16 +976,16 @@ client.on('interactionCreate', async (interaction) => {
 //  YENİ ÜYE KARŞILAMA (Sabit Kanal ID)
 // ══════════════════════════════════════════════════════════════════════════════
 client.on('guildMemberAdd', async (member) => {
-  if (member.user.bot) return; // botları karşılama (ayrı event'te yönetiliyor)
+  if (member.user.bot) return;
 
   const karsilamaKanal = member.guild.channels.cache.get(HOSGELDIN_KANAL);
   if (!karsilamaKanal) return;
 
   const karsilamaMesajlari = [
-    `*"Her büyük yolculuk tek bir adımla başlar..."* 🌸`,
-    `*"Nakama olmak, birlikte güçlenmektir."* ⚔️`,
-    `*"IzaKaya'nın kapıları sana sonsuza kadar açık!"* 🍶`,
-    `*"Yeni bir anime severi daha aramıza katıldı!"* 🎌`,
+    `*"Her büyük klan tek bir savaşçıyla başlar..."* ⚔️`,
+    `*"Güçlü olmak, birlikte savaşmaktan geçer."* 🛡️`,
+    `*"CastiVol'un kapıları sana sonsuza kadar açık!"* ⛏️`,
+    `*"Yeni bir savaşçı daha aramıza katıldı!"* 🏰`,
   ];
   const alinti = karsilamaMesajlari[Math.floor(Math.random() * karsilamaMesajlari.length)];
 
@@ -983,26 +993,25 @@ client.on('guildMemberAdd', async (member) => {
     content: `${member}`,
     embeds: [
       new EmbedBuilder()
-        .setTitle('🌸  Yeni Nakama Geldi!')
+        .setTitle('⚔️  Yeni Savaşçı Geldi!')
         .setDescription(
-          `**${member.user.username}** IzaKaya'ya hoş geldin! 🍶\n\n` +
+          `**${member.user.username}** CastiVol'a hoş geldin! ⛏️\n\n` +
           `> ${alinti}\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n` +
           `📜 **Kuralları oku:** \`!kurallar\` yazabilirsin\n` +
           `✨ **XP kazan:** Mesaj attıkça seviye atlarsın!\n` +
           `🎫 **Yardım lazımsa:** Ticket açabilirsin\n` +
-          `🎌 **Anime sohbeti:** Kanalları keşfet!\n` +
+          `🌍 **Minecraft IP:** \`!minecraft-ip\` yaz!\n` +
           `━━━━━━━━━━━━━━━━━━━━━━`
         )
         .addFields(
-          { name: '👤 Kullanıcı',  value: `${member}`,                                                       inline: true },
-          { name: '📅 Hesap',      value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,        inline: true },
-          { name: '👥 Üye No',     value: `**${member.guild.memberCount}.** üye`,                            inline: true },
+          { name: '👤 Kullanıcı', value: `${member}`,                                                      inline: true },
+          { name: '📅 Hesap',     value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,        inline: true },
+          { name: '👥 Üye No',    value: `**${member.guild.memberCount}.** üye`,                            inline: true },
         )
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setImage('https://i.imgur.com/your-banner.gif') // İstersen buraya sunucu banner gif URL'si koy
         .setColor(COLORS.SAKURA)
-        .setFooter({ text: '🍶 IzaKaya • Anime Sohbet Sunucusu | Hoş geldin!' })
+        .setFooter({ text: '⛏️ CastiVol • Minecraft Klan Sunucusu | Hoş geldin!' })
         .setTimestamp(),
     ],
   }).catch(() => {});
@@ -1017,19 +1026,17 @@ client.login(process.env.TOKEN || process.env.BOT_TOKEN);
 //  ANTİ-RAİD: TOPLU BAN TESPİTİ
 // ══════════════════════════════════════════════════════════════════════════════
 client.on('guildBanAdd', async (ban) => {
-  // Audit log'dan banlayan kişiyi bul
   await new Promise(r => setTimeout(r, 800));
   const logs = await ban.guild.fetchAuditLogs({ type: 22, limit: 5 }).catch(() => null);
   if (!logs) return;
   const entry = logs.entries.first();
   if (!entry || !entry.executor) return;
   const executorId = entry.executor.id;
-  if (executorId === client.user.id) return; // botun kendi eylemi
+  if (executorId === client.user.id) return;
 
   const now = Date.now();
   const kayit = raidTakip.get(executorId) || { banCount: 0, banTime: now, delCount: 0, delTime: now };
 
-  // Pencere sıfırla
   if (now - kayit.banTime > RAID_WINDOW_MS) { kayit.banCount = 0; kayit.banTime = now; }
   kayit.banCount++;
   raidTakip.set(executorId, kayit);
@@ -1068,21 +1075,19 @@ client.on('channelDelete', async (channel) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  ANTİ-RAİD: BOT EKLEME TESPİTİ (düşük yetki)
+//  ANTİ-RAİD: BOT EKLEME TESPİTİ
 // ══════════════════════════════════════════════════════════════════════════════
 client.on('guildMemberAdd', async (member) => {
-  if (!member.user.bot) return; // sadece botlar
+  if (!member.user.bot) return;
   await new Promise(r => setTimeout(r, 800));
   const logs = await member.guild.fetchAuditLogs({ type: 28, limit: 5 }).catch(() => null);
   const entry = logs?.entries?.first();
   const ekleyen = entry?.executor;
 
-  // Sahibi veya admin değilse uyar
   if (ekleyen && ekleyen.id !== member.guild.ownerId) {
     const ekleyenMember = await member.guild.members.fetch(ekleyen.id).catch(() => null);
     const isAdmin = ekleyenMember?.permissions.has(PermissionFlagsBits.Administrator);
     if (!isAdmin) {
-      // Owner'a DM
       const owner = await client.users.fetch(OWNER_ID).catch(() => null);
       if (owner) {
         owner.send({
@@ -1099,7 +1104,7 @@ client.on('guildMemberAdd', async (member) => {
                 { name: '🏰 Sunucu',       value: member.guild.name,                             inline: true },
               )
               .setColor(COLORS.AKA)
-              .setFooter({ text: '🍶 IzaKaya • Güvenlik Sistemi' })
+              .setFooter({ text: '⛏️ CastiVol • Güvenlik Sistemi' })
               .setTimestamp(),
           ],
         }).catch(() => {});
@@ -1109,21 +1114,19 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  RAİD MÜDAHALESİ — Yetkileri al + owner'a DM
+//  RAİD MÜDAHALESİ
 // ══════════════════════════════════════════════════════════════════════════════
 async function raidMudahale(guild, executorId, sebep) {
   try {
     const hedef = await guild.members.fetch(executorId).catch(() => null);
     if (!hedef) return;
 
-    // Tüm rolleri al (owner veya bot değilse)
     if (hedef.id !== guild.ownerId && hedef.manageable) {
       const kaldirilacakRoller = hedef.roles.cache.filter(r => r.id !== guild.id);
       await hedef.roles.remove(kaldirilacakRoller, 'Anti-Raid: Otomatik yetki kaldırma').catch(() => {});
-      await hedef.timeout(60 * 60 * 1000, 'Anti-Raid: 1 saat timeout').catch(() => {}); // 1 saat sustur
+      await hedef.timeout(60 * 60 * 1000, 'Anti-Raid: 1 saat timeout').catch(() => {});
     }
 
-    // Owner'a DM
     const owner = await client.users.fetch(OWNER_ID).catch(() => null);
     if (owner) {
       owner.send({
@@ -1136,18 +1139,17 @@ async function raidMudahale(guild, executorId, sebep) {
               `✅ Tüm rolleri alındı ve 1 saat susturuldu!`
             )
             .addFields(
-              { name: '👤 Saldırgan',  value: `${hedef.user.tag} (\`${hedef.id}\`)`, inline: true },
-              { name: '🏰 Sunucu',     value: guild.name,                             inline: true },
+              { name: '👤 Saldırgan', value: `${hedef.user.tag} (\`${hedef.id}\`)`, inline: true },
+              { name: '🏰 Sunucu',    value: guild.name,                             inline: true },
             )
             .setColor(COLORS.AKA)
             .setThumbnail(hedef.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: '🍶 IzaKaya • Anti-Raid Sistemi' })
+            .setFooter({ text: '⛏️ CastiVol • Anti-Raid Sistemi' })
             .setTimestamp(),
         ],
       }).catch(() => {});
     }
 
-    // Sunucuda da duyur (varsa log kanalı)
     const logKanal = guild.channels.cache.find(c =>
       c.name.includes('log') || c.name.includes('güvenlik') || c.name.includes('mod')
     );
@@ -1166,9 +1168,5 @@ async function raidMudahale(guild, executorId, sebep) {
     console.error('Raid müdahale hatası:', e);
   }
 }
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  LOGIN
-// ═══════════════════════════════════════════════════════════════════════════════
-client.login(process.env.TOKEN || process.env.BOT_TOKEN);
+ENDOFFILE
+echo "Done"
