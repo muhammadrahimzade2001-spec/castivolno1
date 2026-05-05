@@ -13,7 +13,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 
-require('dotenv').config();
+try { require('dotenv').config(); } catch(e) {}
 
 const client = new Client({
   intents: [
@@ -665,4 +665,4 @@ client.on('interactionCreate', async (interaction) => {
 // ══════════════════════════════════════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════════════════════════════════════
-client.login(process.env.BOT_TOKEN);
+client.login(process.env.TOKEN || process.env.BOT_TOKEN);
