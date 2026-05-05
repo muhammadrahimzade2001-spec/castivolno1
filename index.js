@@ -1,291 +1,346 @@
-const { 
-  Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, 
-  ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, 
-  PermissionFlagsBits, ChannelType, ActivityType 
+// ╔══════════════════════════════════════════════════╗
+// ║         CastiVol Discord Bot — index.js          ║
+// ║        ⛏️ Minecraft Klan Sunucusu Botu           ║
+// ║              v2.1 • PVP Klan Savaşları           ║
+// ╚══════════════════════════════════════════════════╝
+
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  ChannelType,
 } = require('discord.js');
 
-// ══════════════════════════════════════════════════════════════════════════
-//  İSTEMCİ AYARLARI (GELİŞMİŞ INTENTLER)
-// ══════════════════════════════════════════════════════════════════════════
+try { require('dotenv').config(); } catch(e) {}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildModeration,
-    GatewayIntentBits.GuildPresences,
-    GatewayIntentBits.GuildVoiceStates
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User]
 });
 
-// ══════════════════════════════════════════════════════════════════════════
-//  YAPILANDIRMA (BURALARI KENDİNE GÖRE DOLDUR)
-// ══════════════════════════════════════════════════════════════════════════
-const CONFIG = {
-  PREFIX: '!',
-  OWNER_ID: '774213567890123456', // Buraya kendi Discord ID'ni yaz
-  GUILD_ID: '123456789012345678', // Sunucu ID'si
-  LOG_KANAL: '123456789012345678', // Logların gideceği kanal
-  HOSGELDIN_KANAL: '123456789012345678',
-  VERSION: '2.0.0-PRO'
-};
+const PREFIX = '!';
 
-const COLORS = {
-  SAKURA: 0xFFB7C5,
-  YUKI: 0xE0FFFF,
-  MURASAKI: 0x9370DB,
-  MIDORI: 0x2ECC71,
-  AKA: 0xE74C3C,
-  KITSUNE: 0xE67E22,
-  NEON: 0x00FFFF,
-  GOLD: 0xF1C40F
-};
+// ─── YAPILANDIRMA ─────────────────────────────────────────────────────────────
+const OWNER_ID        = '1241737610318860298'; // Senin Discord ID'n
+const HOSGELDIN_KANAL = '1500414696170459297'; // Hoşgeldin kanalı
 
-// ══════════════════════════════════════════════════════════════════════════
-//  VERİTABANI VE TAKİP SİSTEMLERİ (MAPS)
-// ══════════════════════════════════════════════════════════════════════════
-const xpData = new Map();
-const uyarilar = new Map();
-const raidTakip = new Map();
-const klanVerisi = new Map();
-const cooldowns = new Map();
-
-// ══════════════════════════════════════════════════════════════════════════
-//  GELİŞMİŞ TICKET YAPILANDIRMASI
-// ══════════════════════════════════════════════════════════════════════════
-const TICKET_SISTEMI = {
-  genel: { label: 'Genel Destek', emoji: '🎫', renk: COLORS.SAKURA, desc: 'Genel sorunlarınız için destek talebi.' },
-  klan: { label: 'Klan Alım / Merge', emoji: '⚔️', renk: COLORS.KITSUNE, desc: 'Klan başvuruları ve birleşme talepleri.' },
-  basvuru: { label: 'Yetkili Başvurusu', emoji: '🛡️', renk: COLORS.MURASAKI, desc: 'Ekibimize katılmak için başvuru yapın.' },
-  sikayet: { label: 'Şikayet & Bildirim', emoji: '🚨', renk: COLORS.AKA, desc: 'Kural ihlallerini buradan bildirin.' },
-  bug: { label: 'Hata Bildirimi', emoji: '🐛', renk: COLORS.NEON, desc: 'Sunucudaki teknik hataları bildirin.' }
-};
-
-// ══════════════════════════════════════════════════════════════════════════
-//  YARDIMCI FONKSİYONLAR (UTIL)
-// ══════════════════════════════════════════════════════════════════════════
-const createEmbed = (title, desc, color = COLORS.SAKURA) => {
-  return new EmbedBuilder().setTitle(title).setDescription(desc).setColor(color).setTimestamp().setFooter({ text: 'CastiVol Security' });
-};
-
-function checkXP(userId) {
-  if (!xpData.has(userId)) xpData.set(userId, { xp: 0, level: 1, messages: 0, money: 100 });
-  return xpData.get(userId);
+// ─── KÜFÜR FİLTRESİ ───────────────────────────────────────────────────────────
+const KUFUR_LISTESI = [
+  'orospu','oç','göt','sik','amk','bok','yarrak','piç','salak',
+  'gerizekalı','aptal','mal','ibne','götlek','kahpe','şerefsiz',
+];
+function kufurVarMi(metin) {
+  const lower = metin.toLowerCase().replace(/[^a-züöşğçı ]/g, '');
+  return KUFUR_LISTESI.some(k => lower.includes(k));
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-//  ANA MESAJ EVENTİ VE KOMUTLAR
-// ══════════════════════════════════════════════════════════════════════════
-client.on('messageCreate', async (message) => {
-  if (message.author.bot || !message.guild) return;
+// ─── ANTI-RAID ────────────────────────────────────────────────────────────────
+const raidTakip = new Map();
+const RAID_LIMIT = 3;
+const RAID_WINDOW = 10000;
 
-  // --- XP VE SEVİYE SİSTEMİ ---
-  const userStats = checkXP(message.author.id);
-  userStats.xp += Math.floor(Math.random() * 8) + 2;
-  userStats.messages++;
-  
-  let targetXP = userStats.level * 200;
-  if (userStats.xp >= targetXP) {
-    userStats.level++;
-    userStats.xp = 0;
-    message.reply(`🌟 **TEBRİKLER!** Seviye atladın! Yeni Seviyen: **${userStats.level}**`).then(m => setTimeout(() => m.delete().catch(() => {}), 6000));
+// ─── RENK PALETİ (Minecraft PVP Teması) ──────────────────────────────────────
+const COLORS = {
+  CREEPER:  0x5B8C3E,   // Ana renk - Creeper yeşili
+  NETHERITE:0x1B1A1A,   // Netherite siyahı
+  DIAMOND:  0x00B5E2,   // Elmas mavisi
+  GOLD:     0xFFD700,   // Klan lideri altın
+  EMERALD:  0x2ECC40,   // Başarı yeşili
+  REDSTONE: 0xFF4136,   // Ban/kritik kırmızı
+  OBSIDIAN: 0x2C2F33,   // Koyu arka plan
+};
+
+// ─── PVP KLan UNVANLARI ───────────────────────────────────────────────────────
+const UNVANLAR = [
+  { min: 1,  unvan: '🪵 Yeni Savaşçı',     emoji: '🪵' },
+  { min: 5,  unvan: '🪨 Taş Savaşçısı',   emoji: '🪨' },
+  { min: 15, unvan: '⚔️ Demir Gladyatör', emoji: '⚔️' },
+  { min: 30, unvan: '🥇 Altın Şampiyon',   emoji: '🥇' },
+  { min: 50, unvan: '💎 Elmas Katili',    emoji: '💎' },
+  { min: 80, unvan: '🔥 Netherite Lord',  emoji: '🔥' },
+  { min: 120,unvan: '🏰 Klan Generali',   emoji: '🏰' },
+  { min: 200,unvan: '👑 Klan İmparatoru', emoji: '👑' },
+];
+
+function getUnvan(level) {
+  return UNVANLAR.find(u => level >= u.min) || UNVANLAR[0];
+}
+
+// ─── XP SİSTEMİ ───────────────────────────────────────────────────────────────
+const xpData = new Map();
+const xpCooldown = new Map();
+
+function getUser(id) {
+  if (!xpData.has(id)) xpData.set(id, { xp: 0, level: 1, kill: 0, death: 0, kdr: 0 });
+  return xpData.get(id);
+}
+
+function addXP(id, amount) {
+  const u = getUser(id);
+  u.xp += amount;
+  const needed = u.level * 150;
+  if (u.xp >= needed) {
+    u.xp -= needed;
+    u.level++;
+    return true;
+  }
+  return false;
+}
+
+// ─── TICKET KATEGORİLERİ (PVP Klan Temalı) ────────────────────────────────────
+const TICKET_KATEGORILER = {
+  'killeader':     { label: '⚔️ Kill Leader Başvuru', renk: COLORS.GOLD },
+  'klan_merge':    { label: '🏰 Klan Merge Talebi',   renk: COLORS.DIAMOND },
+  'pvp_sikayet':   { label: '🔥 PVP Şikayet',         renk: COLORS.REDSTONE },
+  'ekipman_talebi':{ label: '🛡️ Ekipman Talebi',     renk: COLORS.EMERALD },
+  'yetkili':       { label: '👑 Yetkili Başvurusu',   renk: COLORS.GOLD },
+  'bug':           { label: '🐛 Bug Raporu',          renk: COLORS.NETHERITE },
+};
+
+const TICKET_ACIKLAMALAR = {
+  killeader: '⚔️ **Kill Leader Başvurusu**\n\nIGN, K/D, PVP videolarını paylaş!',
+  klan_merge: '🏰 **Klan Merge**\n\nKlanın: Üye sayısı, lider IGN, başarılar?',
+  pvp_sikayet: '🔥 **PVP Şikayet**\n\nRakip IGN, maç linki/video, detaylar?',
+  ekipman_talebi: '🛡️ **Ekipman Talebi**\n\nSeviyen, mevcut ekipman, ihtiyacın?',
+  yetkili: '👑 **Yetkili Başvurusu**\n\nYaş, aktiflik, PVP deneyimi?',
+  bug: '🐛 **Bug Raporu**\n\nNerede oldu, nasıl tekrarlanır?',
+};
+
+// ─── EMBED YARDIMCILARI ───────────────────────────────────────────────────────
+function embed(title, desc, color = COLORS.CREEPER) {
+  return new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(desc)
+    .setColor(color)
+    .setFooter({ text: '⛏️ CastiVol PVP Klan • !yardim' })
+    .setTimestamp();
+}
+
+function hata(desc) {
+  return embed('❌ Hata!', desc, COLORS.REDSTONE);
+}
+
+function basari(desc) {
+  return embed('✅ Başarılı!', desc, COLORS.EMERALD);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// READY
+client.once('ready', () => {
+  console.log(`\n🟢 CastiVol PVP Bot Aktif!\n👤 ${client.user.tag}`);
+  client.user.setActivity('PVP Klan Savaşları | !yardim', { type: 0 });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MESAJ OLAYLARI
+client.on('messageCreate', async (msg) => {
+  if (msg.author.bot) return;
+
+  // KÜFÜR FİLTRESİ
+  if (!msg.content.startsWith(PREFIX) && kufurVarMi(msg.content)) {
+    msg.delete().catch(() => {});
+    msg.channel.send({ 
+      embeds: [embed('⚠️ Küfür Tespit!', `${msg.author} küfür kullandın!`, COLORS.REDSTONE)] 
+    }).then(m => setTimeout(() => m.delete().catch(() => {}), 5e3));
+    return;
   }
 
-  if (!message.content.startsWith(CONFIG.PREFIX)) return;
-
-  const args = message.content.slice(CONFIG.PREFIX.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
-
-  // --- MODERASYON KOMUTLARI ---
-  if (command === 'ban') {
-    if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) return message.reply('Yetkiniz yok!');
-    const member = message.mentions.members.first() || message.guild.members.cache.get(args[0]);
-    if (!member) return message.reply('Kimi banlayayım kanka? Etiketle veya ID yaz.');
-    const reason = args.slice(1).join(' ') || 'Belirtilmedi';
-    await member.ban({ reason });
-    message.channel.send({ embeds: [createEmbed('🔨 Yasaklandı', `**${member.user.tag}** sunucudan uçuruldu.\n**Sebep:** ${reason}`, COLORS.AKA)] });
-  }
-
-  if (command === 'kick') {
-    if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) return message.reply('Yetkiniz yok!');
-    const member = message.mentions.members.first();
-    if (!member) return message.reply('Birini etiketle.');
-    await member.kick();
-    message.reply(`✅ ${member.user.tag} sunucudan atıldı.`);
-  }
-
-  if (command === 'temizle' || command === 'sil') {
-    if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) return;
-    const count = parseInt(args[0]) || 100;
-    await message.channel.bulkDelete(Math.min(count, 100));
-    message.channel.send(`🧹 **${count}** mesaj temizlendi.`).then(m => setTimeout(() => m.delete(), 3000));
-  }
-
-  // --- DUYURU SİSTEMİ ---
-  if (command === 'duyuru') {
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-    const content = args.join(' ');
-    if (!content) return message.reply('Duyuru metni yazmalısın.');
-    message.delete();
-    const dEmbed = new EmbedBuilder()
-      .setTitle('📣 Sunucu Duyurusu')
-      .setDescription(content)
-      .setColor(COLORS.GOLD)
-      .setThumbnail(message.guild.iconURL())
-      .setFooter({ text: `Duyuruyu Yapan: ${message.author.tag}` });
-    message.channel.send({ content: '@everyone', embeds: [dEmbed] });
-  }
-
-  // --- PROFIL VE SIRALAMA ---
-  if (command === 'profil') {
-    const target = message.mentions.users.first() || message.author;
-    const data = checkXP(target.id);
-    const pEmbed = new EmbedBuilder()
-      .setTitle(`👤 ${target.username} Profili`)
-      .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-      .addFields(
-        { name: '🏅 Seviye', value: `\`${data.level}\``, inline: true },
-        { name: '💬 Mesaj', value: `\`${data.messages}\``, inline: true },
-        { name: '💰 Bakiye', value: `\`${data.money}\` Altın`, inline: true },
-        { name: '✨ XP', value: `\`${data.xp} / ${data.level * 200}\``, inline: false }
-      )
-      .setColor(COLORS.SAKURA);
-    message.reply({ embeds: [pEmbed] });
-  }
-
-  // --- TICKET KURULUM ---
-  if (command === 'ticket-kur') {
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId('ticket_select')
-      .setPlaceholder('Destek kategorisi seçin...')
-      .addOptions(Object.entries(TICKET_SISTEMI).map(([key, val]) => 
-        new StringSelectMenuOptionBuilder().setLabel(val.label).setValue(key).setEmoji(val.emoji).setDescription(val.desc)
-      ));
+  // PASİF XP (15s cooldown)
+  if (!msg.content.startsWith(PREFIX)) {
+    const now = Date.now();
+    if (xpCooldown.get(msg.author.id) > now - 15000) return;
+    xpCooldown.set(msg.author.id, now);
     
-    const row = new ActionRowBuilder().addComponents(menu);
-    message.channel.send({
-      embeds: [createEmbed('🎫 CastiVol Destek Merkezi', 'Yaşadığınız sorunları çözmek için aşağıdan kategori seçerek bir talep açabilirsiniz.', COLORS.SAKURA)],
-      components: [row]
-    });
+    const xp = Math.floor(Math.random() * 5) + 2;
+    const levelUp = addXP(msg.author.id, xp);
+    
+    if (levelUp) {
+      const u = getUser(msg.author.id);
+      const unvan = getUnvan(u.level);
+      msg.channel.send({ 
+        embeds: [embed(
+          `${unvan.emoji} LEVEL UP!`,
+          `**${msg.author}** → **Seviye ${u.level}** ${unvan.unvan}\n**+${xp} XP** 💎`,
+          COLORS.GOLD
+        )] 
+      });
+    }
+    return;
   }
 
-  // --- MINECRAFT IP ---
-  if (command === 'ip' || command === 'minecraft') {
-    message.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setTitle('🌍 CastiVol Network')
-          .addFields(
-            { name: '🖥️ Sunucu IP', value: '`mc.castivol.net`', inline: true },
-            { name: '🎮 Sürüm', value: '`1.21.x`', inline: true },
-            { name: '🔗 Site', value: '[www.castivol.net](https://castivol.net)', inline: true }
-          )
-          .setColor(COLORS.NEON)
-          .setImage('https://media.discordapp.net/attachments/123/banner.png') // Buraya kendi bannerını koy
-      ]
+  const args = msg.content.slice(PREFIX.length).trim().split(/ +/);
+  const cmd = args.shift().toLowerCase();
+
+  // PİNG
+  if (cmd === 'ping') {
+    const start = Date.now();
+    const m = await msg.reply({ embeds: [embed('🏓 Ping ölçülüyor...', '...')] });
+    m.edit({ embeds: [embed('🏓 Pong!', `Bot: **${Date.now()-start}ms** | API: **${client.ws.ping}ms**`, COLORS.DIAMOND)] });
+  }
+
+  // SUNUCU BİLGİSİ
+  if (cmd === 'sunucu') {
+    const g = msg.guild;
+    msg.reply({ embeds: [embed(
+      `🏰 ${g.name}`,
+      `**Üye:** ${g.memberCount} | **Kanal:** ${g.channels.cache.size}\n**Kuruluş:** <t:${Math.floor(g.createdTimestamp/1e3)}:D>`,
+      COLORS.CREEPER
+    )] });
+  }
+
+  // PROFİL
+  if (cmd === 'profil') {
+    const target = msg.mentions.users.first() || msg.author;
+    const u = getUser(target.id);
+    const unvan = getUnvan(u.level);
+    const progress = Math.floor((u.xp / (u.level * 150)) * 10);
+    const bar = '█'.repeat(progress) + '░'.repeat(10-progress);
+    
+    msg.reply({ embeds: [embed(
+      `${unvan.emoji} ${target.username}`,
+      `**Seviye:** ${u.level} ${unvan.unvan}\n**XP:** ${u.xp}/${u.level*150} \`${bar}\`\n**K/D:** ${u.kill}/${u.death}`,
+      COLORS.DIAMOND
+    )] });
+  }
+
+  // LİDER TABLOSU
+  if (cmd === 'siralama') {
+    const top = [...xpData.entries()]
+      .sort(([,a], [,b]) => b.level*1000 + b.xp - (a.level*1000 + a.xp))
+      .slice(0, 10);
+    
+    const list = top.map(([id, u], i) => 
+      `${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`} <@${id}> **Lv${u.level}**`
+    ).join('\n');
+    
+    msg.reply({ embeds: [embed('🏆 PVP Lider Tablosu', list, COLORS.GOLD)] });
+  }
+
+  // PVP KOMUTLARI
+  if (cmd === 'pvp-ip') {
+    msg.reply({ embeds: [embed(
+      '🌍 CastiVol PVP Sunucusu',
+      '`play.castivol.net` **• Port: 25565** • **1.20+**',
+      COLORS.DIAMOND
+    )] });
+  }
+
+  if (cmd === 'kill') {
+    const target = msg.mentions.members.first();
+    if (!target) return msg.reply(hata('`!kill @kullanici`'));
+    const u = getUser(msg.author.id);
+    u.kill++;
+    u.kdr = u.kill / Math.max(1, u.death);
+    msg.reply({ embeds: [embed(
+      '💀 KILL!',
+      `**${msg.author}** → **${target.user}**\n**K/D:** ${u.kdr.toFixed(2)}`,
+      COLORS.GOLD
+    )] });
+  }
+
+  if (cmd === 'death') {
+    const u = getUser(msg.author.id);
+    u.death++;
+    u.kdr = u.kill / Math.max(1, u.death);
+    msg.reply({ embeds: [embed(
+      '☠️ DEATH!',
+      `**${msg.author}** öldü!\n**Yeni K/D:** ${u.kdr.toFixed(2)}`,
+      COLORS.REDSTONE
+    )] });
+  }
+
+  // MODERASYON
+  if (cmd === 'ban' && msg.member.permissions.has(PermissionFlagsBits.BanMembers)) {
+    const target = msg.mentions.members.first();
+    if (!target) return msg.reply(hata('`!ban @kullanici [sebep]`'));
+    await target.ban({ reason: args.slice(1).join(' ') || 'Sebep yok' });
+    msg.reply({ embeds: [basari(`**${target.user.tag}** PVP arenasından atıldı! 🔨`)] });
+  }
+
+  if (cmd === 'temizle' && msg.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    const amount = parseInt(args[0]);
+    if (!amount || amount > 100) return msg.reply(hata('1-100 arası sayı!'));
+    await msg.channel.bulkDelete(amount, true);
+    msg.channel.send(basari(`${amount} mesaj temizlendi! 🧹`)).then(m => setTimeout(() => m.delete(), 3e3));
+  }
+
+  // TICKET KURULUMU
+  if (cmd === 'ticket-kur' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId('ticket_menu')
+      .setPlaceholder('⚔️ PVP Ticket Seç...')
+      .addOptions(Object.entries(TICKET_KATEGORILER).map(([k, v]) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(v.label).setValue(k).setEmoji(v.label.includes('Kill') ? '⚔️' : '🏰')
+      ));
+
+    msg.channel.send({
+      embeds: [embed('⚔️ CastiVol PVP Destek', 'Ticket kategorini seç! 👑')],
+      components: [new ActionRowBuilder().addComponents(menu)]
     });
+    msg.delete();
+  }
+
+  // YARDIM
+  if (['yardim', 'help'].includes(cmd)) {
+    msg.reply({ embeds: [embed(
+      '⚔️ CastiVol PVP Bot Komutları',
+      '`!profil` • `!siralama` • `!pvp-ip`\n' +
+      '`!kill @hedef` • `!death` • `!ping`\n' +
+      '`!ban` • `!temizle` • `!ticket-kur` (admin)\n\n' +
+      '**⛏️ Prefix: ! • PVP Klan Savaşları**',
+      COLORS.CREEPER
+    )] });
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
-//  GELİŞMİŞ ETKİLEŞİM İŞLEYİCİ (TICKET & BUTTONS)
-// ══════════════════════════════════════════════════════════════════════════
-client.on('interactionCreate', async (interaction) => {
-  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select') {
-    const category = interaction.values[0];
-    const settings = TICKET_SISTEMI[category];
-    
-    await interaction.deferReply({ ephemeral: true });
-
-    const channel = await interaction.guild.channels.create({
-      name: `ticket-${category}-${interaction.user.username}`,
+// ══════════════════════════════════════════════════════════════════════════════
+// TICKET & BUTTONS
+client.on('interactionCreate', async i => {
+  if (i.isStringSelectMenu() && i.customId === 'ticket_menu') {
+    const kategori = TICKET_KATEGORILER[i.values[0]];
+    const kanal = await i.guild.channels.create({
+      name: `pvp-${i.values[0]}-${i.user.id}`,
       type: ChannelType.GuildText,
       permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-        { id: CONFIG.OWNER_ID, allow: [PermissionFlagsBits.ViewChannel] }
+        { id: i.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: i.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
       ]
     });
 
-    const tEmbed = new EmbedBuilder()
-      .setTitle(`${settings.emoji} ${settings.label} Talebi`)
-      .setDescription(`Hoş geldin ${interaction.user}! Yetkililerimiz en kısa sürede seninle ilgilenecek.\n\n**Kategori:** ${settings.label}`)
-      .setColor(settings.renk);
-
-    const buttons = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('ticket_close').setLabel('Talebi Kapat').setEmoji('🔒').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('ticket_claim').setLabel('Sahiplen').setEmoji('✋').setStyle(ButtonStyle.Success)
-    );
-
-    await channel.send({ content: `${interaction.user} | <@&YETKILI_ROL_ID>`, embeds: [tEmbed], components: [buttons] });
-    interaction.editReply(`✅ Talebin açıldı: ${channel}`);
-  }
-
-  if (interaction.isButton()) {
-    if (interaction.customId === 'ticket_close') {
-      await interaction.reply('🔒 Kanal 5 saniye içinde kalıcı olarak siliniyor...');
-      setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
-    }
-    if (interaction.customId === 'ticket_claim') {
-      interaction.reply({ embeds: [createEmbed('✋ Sahiplenildi', `Bu destek talebi **${interaction.user.tag}** tarafından devralındı.`, COLORS.MIDORI)] });
-    }
+    kanal.send(embed(
+      `${kategori.label} Ticket`,
+      TICKET_ACIKLAMALAR[i.values[0]],
+      kategori.renk
+    ));
+    
+    i.reply({ content: `✅ Ticket açıldı: ${kanal}`, ephemeral: true });
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════
-//  GÜVENLİK DUVARI (ANTI-RAID & PROTECTION)
-// ══════════════════════════════════════════════════════════════════════════
-client.on('guildBanAdd', async (ban) => {
-  const auditLogs = await ban.guild.fetchAuditLogs({ type: 22, limit: 1 }).catch(() => null);
-  const entry = auditLogs?.entries.first();
-  if (!entry || entry.executor.id === client.user.id) return;
-
-  const executorId = entry.executor.id;
-  const now = Date.now();
-  const data = raidTakip.get(executorId) || { count: 0, lastAction: now };
-
-  if (now - data.lastAction > 10000) data.count = 0; // 10 saniye geçince sıfırla
-  data.count++;
-  data.lastAction = now;
-  raidTakip.set(executorId, data);
-
-  if (data.count >= 4) { // 10 saniyede 4 ban atarsa
-    const member = await ban.guild.members.fetch(executorId).catch(() => null);
-    if (member && member.id !== CONFIG.OWNER_ID) {
-      await member.roles.remove(member.roles.cache).catch(() => {});
-      await member.timeout(3600000, 'Anti-Raid: Toplu Ban Tespiti').catch(() => {});
-      
-      const owner = await client.users.fetch(CONFIG.OWNER_ID).catch(() => null);
-      owner?.send(`🚨 **ACİL DURUM:** ${member.user.tag} sunucuda raid yapmaya çalıştı! Yetkileri alındı.`);
-    }
-  }
-});
-
-// ══════════════════════════════════════════════════════════════════════════
-//  AÇILIŞ VE HATA YÖNETİMİ
-// ══════════════════════════════════════════════════════════════════════════
-client.once('ready', () => {
-  console.log(`
-  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-  ┃  🤖 BOT: ${client.user.tag}
-  ┃  🆔 ID: ${client.user.id}
-  ┃  🛡️ ANTI-RAID: AKTİF
-  ┃  ✨ VERSİYON: ${CONFIG.VERSION}
-  ┃  🚀 DURUM: Çalışıyor...
-  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-  `);
+// ══════════════════════════════════════════════════════════════════════════════
+// HOŞGELDİN
+client.on('guildMemberAdd', member => {
+  const kanal = member.guild.channels.cache.get(HOSGELDIN_KANAL);
+  if (!kanal) return;
   
-  client.user.setPresence({
-    activities: [{ name: '!yardim | mc.castivol.net', type: ActivityType.Watching }],
-    status: 'dnd'
-  });
+  kanal.send(embed(
+    '⚔️ Yeni PVP Savaşçısı!',
+    `**${member}** arenaya katıldı!\n**!pvp-ip** ile sunucuya bağlan!\n**!profil** seviye öğren!`,
+    COLORS.GOLD
+  ));
 });
 
-process.on('unhandledRejection', (error) => {
-  console.error('❌ Beklenmedik bir hata oluştu:', error);
-});
-
-client.login(process.env.TOKEN); // Tokenini .env dosyasına TOKEN=... şeklinde ekle
+// LOGIN
+client.login(process.env.TOKEN);
